@@ -1,0 +1,13 @@
+*.a
+*.la
+*.so
+*.o
+
+*.dll
+*.exe
+*.lib
+Debug
+Release
+_msvc/.vs
+
+*.bmp
