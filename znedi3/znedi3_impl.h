@@ -1,13 +1,10 @@
 #pragma once
 
-#ifndef ZNEDI3_IMPL_H_
-#define ZNEDI3_IMPL_H_
+#ifndef ZNEDI3_ZNEDI3_IMPL_H_
+#define ZNEDI3_ZNEDI3_IMPL_H_
 
 #include <cstddef>
-#include <functional>
 #include <memory>
-#include <unordered_map>
-#include <vector>
 #include "kernel.h"
 #include "znedi3.h"
 
@@ -18,12 +15,6 @@ protected:
 
 namespace znedi3 {
 
-enum class CPUClass {
-	NONE,
-	AUTO,
-	AUTO_64B,
-};
-
 enum class PixelType {
 	BYTE,
 	WORD,
@@ -32,27 +23,6 @@ enum class PixelType {
 };
 
 class NNEDI3Weights;
-
-class znedi3_pixel_io {
-public:
-	virtual ~znedi3_pixel_io() = default;
-
-	virtual void convert(const void *src, void *dst, size_t n) const = 0;
-};
-
-class znedi3_prescreener {
-public:
-	virtual ~znedi3_prescreener() = default;
-
-	virtual void prescreen(const void *src, ptrdiff_t src_stride, unsigned char *prescreen, unsigned n) const = 0;
-};
-
-class znedi3_predictor {
-public:
-	virtual ~znedi3_predictor() = default;
-
-	virtual void predict(const void *src, ptrdiff_t src_stride, void *dst, const unsigned char *prescreen, unsigned n) const = 0;
-};
 
 class znedi3_filter : public ::znedi3_filter {
 	std::unique_ptr<Prescreener> m_prescreener;
@@ -73,4 +43,4 @@ public:
 
 } // namespace znedi3
 
-#endif // ZNEDI3_IMPL_H_
+#endif // ZNEDI3_ZNEDI3_IMPL_H_

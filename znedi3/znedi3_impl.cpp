@@ -2,6 +2,9 @@
 #include <cmath>
 #include <cstddef>
 #include <stdexcept>
+#include "align.h"
+#include "alloc.h"
+#include "cpuinfo.h"
 #include "weights.h"
 #include "znedi3_impl.h"
 
@@ -19,18 +22,24 @@ CPUClass translate_cpu_type(znedi3_cpu_type_e e)
 		return CPUClass::AUTO_64B;
 #if defined(__i386) || defined(_M_IX86) || defined(_M_X64) || defined(__x86_64__)
 	case ZNEDI3_CPU_X86_MMX:
+		return CPUClass::NONE;
 	case ZNEDI3_CPU_X86_SSE:
+		return CPUClass::X86_SSE;
 	case ZNEDI3_CPU_X86_SSE2:
 	case ZNEDI3_CPU_X86_SSE3:
 	case ZNEDI3_CPU_X86_SSSE3:
 	case ZNEDI3_CPU_X86_SSE41:
 	case ZNEDI3_CPU_X86_SSE42:
+		return CPUClass::X86_SSE2;
 	case ZNEDI3_CPU_X86_AVX:
+		return CPUClass::X86_AVX;
 	case ZNEDI3_CPU_X86_F16C:
+		return CPUClass::X86_F16C;
 	case ZNEDI3_CPU_X86_AVX2:
 	case ZNEDI3_CPU_X86_AVX512F:
+		return CPUClass::X86_AVX2;
 	case ZNEDI3_CPU_X86_AVX512_SKL:
-		return CPUClass::NONE;
+		return CPUClass::X86_AVX512;
 #endif
 	default:
 		throw std::domain_error{ "bad cpu" };
@@ -164,35 +173,37 @@ void znedi3_filter::process(unsigned width, unsigned height, const void *src, pt
 	assert(height_d < PTRDIFF_MAX - 6);
 
 	// Create padded image.
-	std::vector<float> pad;
+	AlignedVector<float> pad;
 
-	ptrdiff_t pad_stride = (width + 48) * sizeof(float);
+	ptrdiff_t pad_stride = ceil_n((width + 64) * sizeof(float), ALIGNMENT);
 	ptrdiff_t pad_stride_f = pad_stride / sizeof(float);
 	pad.resize(pad_stride_f * (height + 6));
 
-	float *pad_p = pad.data() + pad_stride_f * 3 + 24;
+	float *pad_p = pad.data() + 3 * pad_stride_f + 32;
 
 	for (ptrdiff_t i = 0; i < height_d; ++i) {
 		m_pixel_load_func(static_cast<const unsigned char *>(src) + i * src_stride, pad_p + i * pad_stride_f, width);
 
-		for (ptrdiff_t j = -24; j < 0; ++j) {
+		for (ptrdiff_t j = -32; j < 0; ++j) {
 			pad_p[i * pad_stride_f + j] = pad_p[i * pad_stride_f];
 		}
-		for (ptrdiff_t j = width_d; j < width_d + 24; ++j) {
+		for (ptrdiff_t j = width_d; j < width_d + 32; ++j) {
 			pad_p[i * pad_stride_f + j] = pad_p[i * pad_stride_f + (width_d - 1)];
 		}
 	}
 	for (ptrdiff_t i = -3; i < 0; ++i) {
-		std::copy_n(pad_p - 24, width_d + 48, pad_p + i * pad_stride_f - 24);
+		std::copy_n(pad_p - 32, width_d + 64, pad_p + i * pad_stride_f - 32);
 	}
 	for (ptrdiff_t i = height_d; i < height_d + 3; ++i) {
-		std::copy_n(pad_p + (height_d - 1) * pad_stride_f - 24, width_d + 48, pad_p + i * pad_stride_f - 24);
+		std::copy_n(pad_p + (height_d - 1) * pad_stride_f - 32, width_d + 64, pad_p + i * pad_stride_f - 32);
 	}
 
 	// Create temporary destination image.
-	std::vector<float> dst_tmp(static_cast<size_t>(width) * height);
+	AlignedVector<float> dst_tmp;
+	ptrdiff_t dst_tmp_stride_f = ceil_n(width_d, ALIGNMENT / sizeof(float));
+
+	dst_tmp.resize(dst_tmp_stride_f * height_d);
 	float *dst_tmp_p = dst_tmp.data();
-	ptrdiff_t dst_tmp_stride_f = width;
 
 	// Initialize pointers. Set the source pointer to the row below the current output row.
 	const float *src_p = pad_p + (parity ? pad_stride_f : 0);
@@ -201,7 +212,7 @@ void znedi3_filter::process(unsigned width, unsigned height, const void *src, pt
 	ptrdiff_t dst_p_stride_f = dst_tmp_stride_f;
 
 	// Main loop.
-	std::vector<unsigned char> prescreen(width_d + 4);
+	AlignedVector<unsigned char> prescreen(ceil_n(width_d + 4, ALIGNMENT));
 
 	for (ptrdiff_t i = 0; i < height_d; ++i) {
 		if (m_prescreener)

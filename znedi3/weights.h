@@ -1,11 +1,12 @@
 #pragma once
 
-#ifndef WEIGHTS_H_
-#define WEIGHTS_H_
+#ifndef ZNEDI3_WEIGHTS_H_
+#define ZNEDI3_WEIGHTS_H_
 
 #include <cstddef>
 #include <memory>
 #include <unordered_map>
+#include <utility>
 
 struct znedi3_weights {
 protected:
@@ -125,4 +126,4 @@ constexpr bool operator!=(const PredictorTraits &lhs, const PredictorTraits &rhs
 
 } // namespace znedi3
 
-#endif // WEIGHTS_H_
+#endif // ZNEDI3_WEIGHTS_H_

@@ -9,6 +9,10 @@
 #include "weights.h"
 #include "znedi3_impl.h"
 
+#ifdef ZNEDI3_X86
+  #include "x86/kernel_x86.h"
+#endif
+
 namespace znedi3 {
 namespace {
 
@@ -346,6 +350,10 @@ std::unique_ptr<Prescreener> create_prescreener_new(const PrescreenerNewCoeffici
 std::unique_ptr<Predictor> create_predictor(const std::pair<const PredictorTraits, PredictorCoefficients> &model, bool use_q2, CPUClass cpu)
 {
 	std::unique_ptr<Predictor> ret;
+
+#ifdef ZNEDI3_X86
+	ret = create_predictor_x86(model, use_q2, cpu);
+#endif
 
 	if (!ret)
 		ret = std::make_unique<PredictorC>(model, use_q2);

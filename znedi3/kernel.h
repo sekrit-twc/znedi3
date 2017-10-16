@@ -1,21 +1,17 @@
 #pragma once
 
-#ifndef KERNEL_H_
-#define KERNEL_H_
+#ifndef ZNEDI3_KERNEL_H_
+#define ZNEDI3_KERNEL_H_
 
 #include <cstddef>
 #include <memory>
+#include <utility>
+#include "weights.h"
 
 namespace znedi3 {
 
 enum class CPUClass;
 enum class PixelType;
-
-struct PrescreenerOldCoefficients;
-struct PrescreenerNewCoefficients;
-
-struct PredictorTraits;
-struct PredictorCoefficients;
 
 typedef void (*pixel_io_func)(const void *src, void *dst, size_t n);
 typedef void (*interpolate_func)(const void *src, ptrdiff_t src_stride, void *dst, const unsigned char *prescreen, unsigned n);
@@ -43,4 +39,4 @@ std::unique_ptr<Predictor> create_predictor(const std::pair<const PredictorTrait
 
 } // namespace znedi3
 
-#endif // KERNEL_H_
+#endif // ZNEDI3_KERNEL_H_
