@@ -5,6 +5,7 @@
 #include <stdexcept>
 #include <vector>
 #include "argparse.h"
+#include "timer.h"
 #include "win32_bitmap.h"
 #include "znedi3.h"
 
@@ -80,17 +81,19 @@ struct Arguments {
 	int show_mask = -1;
 	char top = 1;
 	char bottom = 1;
+	int times = 1;
 };
 
 constexpr ArgparseOption program_switches[] = {
-	{ OPTION_INT,  "s", "nsize",     offsetof(Arguments, nsize),     nullptr, "window size (0-6)" },
-	{ OPTION_INT,  "n", "nns",       offsetof(Arguments, nns),       nullptr, "neuron size (0-4)" },
-	{ OPTION_INT,  "q", "qual",      offsetof(Arguments, qual),      nullptr, "quality level (1-2)" },
-	{ OPTION_INT,  "e", "etype",     offsetof(Arguments, etype),     nullptr, "error type (0-1)" },
-	{ OPTION_INT,  "p", "prescreen", offsetof(Arguments, prescreen), nullptr, "prescreener (0-4)" },
-	{ OPTION_INT,  "m", "show-mask", offsetof(Arguments, show_mask), nullptr, "show mask" },
-	{ OPTION_FLAG, "t", "top",      offsetof(Arguments, top),       nullptr, "interpolate top field" },
-	{ OPTION_FLAG, "b", "bottom",   offsetof(Arguments, bottom),    nullptr, "interpolate bottom field" },
+	{ OPTION_INT,  "s",     "nsize",     offsetof(Arguments, nsize),     nullptr, "window size (0-6)" },
+	{ OPTION_INT,  "n",     "nns",       offsetof(Arguments, nns),       nullptr, "neuron size (0-4)" },
+	{ OPTION_INT,  "q",     "qual",      offsetof(Arguments, qual),      nullptr, "quality level (1-2)" },
+	{ OPTION_INT,  "e",     "etype",     offsetof(Arguments, etype),     nullptr, "error type (0-1)" },
+	{ OPTION_INT,  "p",     "prescreen", offsetof(Arguments, prescreen), nullptr, "prescreener (0-4)" },
+	{ OPTION_INT,  "m",     "show-mask", offsetof(Arguments, show_mask), nullptr, "show mask" },
+	{ OPTION_FLAG, "t",     "top",      offsetof(Arguments, top),       nullptr, "interpolate top field" },
+	{ OPTION_FLAG, "b",     "bottom",   offsetof(Arguments, bottom),    nullptr, "interpolate bottom field" },
+	{ OPTION_INT,  nullptr, "times",    offsetof(Arguments, times),     nullptr, "number of iterations" },
 	{ OPTION_NULL },
 };
 
@@ -108,6 +111,38 @@ constexpr ArgparseCommandLine program_cmd = {
 	"process images with nnedi3",
 	nullptr
 };
+
+
+void execute(const Arguments &args, const znedi3_filter *filter, const PlanarImage &in, PlanarImage &out)
+{
+	std::vector<unsigned char> tmp(znedi3_filter_get_tmp_size(filter, in.width[0], in.height[0] / 2));
+
+	std::pair<double, double> results = measure_benchmark(args.times, [&]()
+	{
+		for (unsigned p = 0; p < 3; ++p) {
+			// Interpolate top field.
+			if (args.top) {
+				znedi3_filter_process(filter, out.width[p], out.height[p] / 2,
+				                      in.data[p].data() + in.stride[p], in.stride[p] * 2, out.data[p].data(), out.stride[p] * 2,
+				                      tmp.data(), 0);
+			}
+
+			// Interpolate bottom field.
+			if (args.bottom) {
+				znedi3_filter_process(filter, out.width[p], out.height[p] / 2,
+				                      in.data[p].data(), in.stride[p] * 2, out.data[p].data() + out.stride[p], out.stride[p] * 2,
+				                      tmp.data(), 1);
+			}
+		}
+	});
+
+	double pels_per_field = static_cast<double>(out.width[0]) * (out.height[0] / 2) * 3;
+	double pels_filtered = pels_per_field * (!!args.top + !!args.bottom);
+
+	std::cout << "average: " << results.first << '\n';
+	std::cout << "min: " << results.second << '\n';
+	std::cout << "Mpx/s: " << (pels_filtered / results.first) / 1e6 << '\n';
+}
 
 } // namespace
 
@@ -153,24 +188,7 @@ int main(int argc, char **argv)
 		bitmap_to_planar(in, in_planar);
 		PlanarImage out_planar = in_planar;
 
-		std::vector<unsigned char> tmp(znedi3_filter_get_tmp_size(filter.get(), in.width(), in.height()));
-		for (unsigned p = 0; p < 3; ++p) {
-			// Interpolate top field.
-			if (args.top) {
-				znedi3_filter_process(filter.get(), out_planar.width[p], out_planar.height[p] / 2,
-				                      in_planar.data[p].data() + in_planar.stride[p], in_planar.stride[p] * 2,
-				                      out_planar.data[p].data(), out_planar.stride[p] * 2,
-				                      tmp.data(), 0);
-			}
-
-			// Interpolate bottom field.
-			if (args.bottom) {
-				znedi3_filter_process(filter.get(), out_planar.width[p], out_planar.height[p] / 2,
-				                      in_planar.data[p].data(), in_planar.stride[p] * 2,
-				                      out_planar.data[p].data() + out_planar.stride[p], out_planar.stride[p] * 2,
-				                      tmp.data(), 1);
-			}
-		}
+		execute(args, filter.get(), in_planar, out_planar);
 
 		WindowsBitmap out{ args.output, in.width(), in.height(), 24 };
 		planar_to_bitmap(out_planar, out);

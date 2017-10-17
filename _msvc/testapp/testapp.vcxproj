@@ -129,6 +129,7 @@
   <ItemGroup>
     <ClInclude Include="..\..\testapp\argparse.h" />
     <ClInclude Include="..\..\testapp\mmap.h" />
+    <ClInclude Include="..\..\testapp\timer.h" />
     <ClInclude Include="..\..\testapp\win32_bitmap.h" />
   </ItemGroup>
   <ItemGroup>

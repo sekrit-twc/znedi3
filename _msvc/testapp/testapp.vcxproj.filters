@@ -24,6 +24,9 @@
     <ClInclude Include="..\..\testapp\win32_bitmap.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\testapp\timer.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\testapp\argparse.cpp">
