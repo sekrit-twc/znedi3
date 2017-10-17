@@ -302,6 +302,10 @@ pixel_io_func select_pixel_io_func(PixelType in, PixelType out, CPUClass cpu)
 {
 	pixel_io_func ret = nullptr;
 
+#ifdef ZNEDI3_X86
+	ret = select_pixel_io_func_x86(in, out, cpu);
+#endif
+
 	if (!ret && in == PixelType::BYTE && out == PixelType::FLOAT)
 		ret = integer_to_float<uint8_t>;
 	if (!ret && in == PixelType::WORD && out == PixelType::FLOAT)

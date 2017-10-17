@@ -135,6 +135,7 @@ int main(int argc, char **argv)
 		};
 
 		params.pixel_type = ZNEDI_PIXEL_BYTE;
+		params.cpu = ZNEDI3_CPU_AUTO_64B;
 		propagate_if_set(params.nsize, args.nsize);
 		propagate_if_set(params.nns, args.nns);
 		propagate_if_set(params.qual, args.qual);
