@@ -219,8 +219,8 @@ void znedi3_filter::process(unsigned width, unsigned height, const void *src, pt
 			m_prescreener->process(src_p, src_p_stride_f * sizeof(float), prescreen.data(), width);
 		if (m_predictor)
 			m_predictor->process(src_p, src_p_stride_f * sizeof(float), dst_p, prescreen.data(), width);
-
-		m_interpolate_func(src_p, src_p_stride_f * sizeof(float), dst_p, prescreen.data(), width);
+		if (m_prescreener)
+			m_interpolate_func(src_p, src_p_stride_f * sizeof(float), dst_p, prescreen.data(), width);
 
 		src_p += src_p_stride_f;
 		dst_p += dst_p_stride_f;
