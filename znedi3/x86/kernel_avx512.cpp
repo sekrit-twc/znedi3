@@ -13,191 +13,36 @@
 namespace znedi3 {
 namespace {
 
-inline FORCE_INLINE float mm512_horizontal_sum_ps(__m512 x)
+inline FORCE_INLINE __m128 mm512_horizontal_sum2_ps(__m512 x, __m512 y)
 {
-	__m256 stage1 = _mm256_add_ps(_mm512_castps512_ps256(x), _mm512_extractf32x8_ps(x, 1));
-	__m256 stage2 = _mm256_hadd_ps(stage1, stage1);
+	__m256 stage1x = _mm256_add_ps(_mm512_castps512_ps256(x), _mm512_extractf32x8_ps(x, 1));
+	__m256 stage1y = _mm256_add_ps(_mm512_castps512_ps256(y), _mm512_extractf32x8_ps(y, 1));
+	__m256 stage2 = _mm256_hadd_ps(stage1x, stage1y);
 	__m256 stage3 = _mm256_hadd_ps(stage2, stage2);
-	__m128 stage4 = _mm_add_ss(_mm256_castps256_ps128(stage3), _mm256_extractf128_ps(stage3, 1));
-	return _mm_cvtss_f32(stage4);
+	__m128 stage4 = _mm_add_ps(_mm256_castps256_ps128(stage3), _mm256_extractf128_ps(stage3, 1));
+	return stage4;
 }
 
-inline FORCE_INLINE double mm512d_horizontal_sum_pd(__m512d x)
+inline FORCE_INLINE __m128d mm512_horizontal_sum2_pd(__m512d x, __m512d y)
 {
-	__m256d stage1 = _mm256_add_pd(_mm512_castpd512_pd256(x), _mm512_extractf64x4_pd(x, 1));
-	__m256d stage2 = _mm256_hadd_pd(stage1, stage1);
-	__m128d stage3 = _mm_add_sd(_mm256_castpd256_pd128(stage2), _mm256_extractf128_pd(stage2, 1));
-	return _mm_cvtsd_f64(stage3);
+	__m256d stage1x = _mm256_add_pd(_mm512_castpd512_pd256(x), _mm512_extractf64x4_pd(x, 1));
+	__m256d stage1y = _mm256_add_pd(_mm512_castpd512_pd256(y), _mm512_extractf64x4_pd(y, 1));
+	__m256d stage2 = _mm256_hadd_pd(stage1x, stage1y);
+	__m128d stage3 = _mm_add_pd(_mm256_castpd256_pd128(stage2), _mm256_extractf128_pd(stage2, 1));
+	return stage3;
 }
 
-inline FORCE_INLINE __m512 mm512_elliott_ps(__m512 x)
+inline FORCE_INLINE __m128 mm_rsqrt24_ss(__m128 x)
 {
-	const __m512i mask = _mm512_set1_epi32(UINT32_MAX >> 1);
-
-	__m512 den = _mm512_and_ps(x, _mm512_castsi512_ps(mask));
-	den = _mm512_add_ps(den, _mm512_set1_ps(1.0f));
-
-	return _mm512_div_ps(x, den);
-}
-
-inline FORCE_INLINE void gather_pixels_avx512(const float *src, ptrdiff_t src_stride, ptrdiff_t xdim, ptrdiff_t ydim, float *buf, double inv_size, float mstd[4])
-{
-	ptrdiff_t src_stride_f = src_stride / sizeof(float);
-
-	__m512d sum = _mm512_setzero_pd();
-	__m512d sumsq = _mm512_setzero_pd();
-
-	for (ptrdiff_t i = 0; i < ydim; ++i) {
-		for (ptrdiff_t j = 0; j < xdim; j += 8) {
-			__m256 val = _mm256_load_ps(src + j);
-
-			__m512d vald = _mm512_cvtps_pd(val);
-			sum = _mm512_add_pd(sum, vald);
-			sumsq = _mm512_fmadd_pd(vald, vald, sumsq);
-
-			_mm256_store_ps(buf + j, val);
-		}
-		src += src_stride_f;
-		buf += xdim;
-	}
-
-	// Get horizontal sums.
-	double sum_reduced = mm512d_horizontal_sum_pd(sum);
-	double sumsq_reduced = mm512d_horizontal_sum_pd(sumsq);
-
-	mstd[0] = static_cast<float>(sum_reduced * inv_size);
-	mstd[3] = 0.0f;
-
-	double tmp = sumsq_reduced * inv_size - static_cast<double>(mstd[0]) * mstd[0];
-	if (tmp < FLT_EPSILON) {
-		mstd[1] = 0.0f;
-		mstd[2] = 0.0f;
-	} else {
-		mstd[1] = static_cast<float>(_mm_cvtsd_f64(_mm_sqrt_pd(_mm_set_sd(tmp))));
-		mstd[2] = 1.0f / mstd[1];
-	}
-}
-
-inline FORCE_INLINE void zero_memory_avx512(float *ptr, unsigned n)
-{
-	for (unsigned i = 0; i < n; i += 32) {
-		_mm512_store_ps(ptr + i + 0, _mm512_setzero_ps());
-		_mm512_store_ps(ptr + i + 16, _mm512_setzero_ps());
-	}
-}
-
-void interleaved_convolution_avx512(const float *kernels, const float *input, unsigned nns, unsigned n, float *output, float scale, const float *bias)
-{
-	const float *kptr0 = kernels;
-	const float *kptr1 = kernels + 1 * static_cast<ptrdiff_t>(nns) * 2;
-	const float *kptr2 = kernels + 2 * static_cast<ptrdiff_t>(nns) * 2;
-	const float *kptr3 = kernels + 3 * static_cast<ptrdiff_t>(nns) * 2;
-	const float *kptr4 = kernels + 4 * static_cast<ptrdiff_t>(nns) * 2;
-	const float *kptr5 = kernels + 5 * static_cast<ptrdiff_t>(nns) * 2;
-	const float *kptr6 = kernels + 6 * static_cast<ptrdiff_t>(nns) * 2;
-	const float *kptr7 = kernels + 7 * static_cast<ptrdiff_t>(nns) * 2;
-
-	for (ptrdiff_t k = 0; k < n; k += 8) {
-		__m512 x0 = _mm512_set1_ps(input[k + 0]);
-		__m512 x1 = _mm512_set1_ps(input[k + 1]);
-		__m512 x2 = _mm512_set1_ps(input[k + 2]);
-		__m512 x3 = _mm512_set1_ps(input[k + 3]);
-		__m512 x4 = _mm512_set1_ps(input[k + 4]);
-		__m512 x5 = _mm512_set1_ps(input[k + 5]);
-		__m512 x6 = _mm512_set1_ps(input[k + 6]);
-		__m512 x7 = _mm512_set1_ps(input[k + 7]);
-
-		for (ptrdiff_t nn = 0; nn < nns * 2; nn += 32) {
-			__m512 n00_15_a = _mm512_load_ps(output + nn);
-			__m512 n16_31_a = _mm512_load_ps(output + nn + 16);
-			__m512 n00_15_b = _mm512_setzero_ps();
-			__m512 n16_31_b = _mm512_setzero_ps();
-			__m512 c;
-
-			c = _mm512_load_ps(kptr0 + nn + 0);
-			n00_15_a = _mm512_fmadd_ps(c, x0, n00_15_a);
-
-			c = _mm512_load_ps(kptr0 + nn + 16);
-			n16_31_a = _mm512_fmadd_ps(c, x0, n16_31_a);
-
-			c = _mm512_load_ps(kptr1 + nn + 0);
-			n00_15_b = _mm512_fmadd_ps(c, x1, n00_15_b);
-
-			c = _mm512_load_ps(kptr1 + nn + 16);
-			n16_31_b = _mm512_fmadd_ps(c, x1, n16_31_b);
-
-			c = _mm512_load_ps(kptr2 + nn + 0);
-			n00_15_a = _mm512_fmadd_ps(c, x2, n00_15_a);
-
-			c = _mm512_load_ps(kptr2 + nn + 16);
-			n16_31_a = _mm512_fmadd_ps(c, x2, n16_31_a);
-
-			c = _mm512_load_ps(kptr3 + nn + 0);
-			n00_15_b = _mm512_fmadd_ps(c, x3, n00_15_b);
-
-			c = _mm512_load_ps(kptr3 + nn + 16);
-			n16_31_b = _mm512_fmadd_ps(c, x3, n16_31_b);
-
-			c = _mm512_load_ps(kptr4 + nn + 0);
-			n00_15_a = _mm512_fmadd_ps(c, x4, n00_15_a);
-
-			c = _mm512_load_ps(kptr4 + nn + 16);
-			n16_31_a = _mm512_fmadd_ps(c, x4, n16_31_a);
-
-			c = _mm512_load_ps(kptr5 + nn + 0);
-			n00_15_b = _mm512_fmadd_ps(c, x5, n00_15_b);
-
-			c = _mm512_load_ps(kptr5 + nn + 16);
-			n16_31_b = _mm512_fmadd_ps(c, x5, n16_31_b);
-
-			c = _mm512_load_ps(kptr6 + nn + 0);
-			n00_15_a = _mm512_fmadd_ps(c, x6, n00_15_a);
-
-			c = _mm512_load_ps(kptr6 + nn + 16);
-			n16_31_a = _mm512_fmadd_ps(c, x6, n16_31_a);
-
-			c = _mm512_load_ps(kptr7 + nn + 0);
-			n00_15_b = _mm512_fmadd_ps(c, x7, n00_15_b);
-
-			c = _mm512_load_ps(kptr7 + nn + 16);
-			n16_31_b = _mm512_fmadd_ps(c, x7, n16_31_b);
-
-			n00_15_a = _mm512_add_ps(n00_15_a, n00_15_b);
-			n16_31_a = _mm512_add_ps(n16_31_a, n16_31_b);
-
-			_mm512_store_ps(output + nn, n00_15_a);
-			_mm512_store_ps(output + nn + 16, n16_31_a);
-		}
-
-		kptr0 += 8 * static_cast<ptrdiff_t>(nns) * 2;
-		kptr1 += 8 * static_cast<ptrdiff_t>(nns) * 2;
-		kptr2 += 8 * static_cast<ptrdiff_t>(nns) * 2;
-		kptr3 += 8 * static_cast<ptrdiff_t>(nns) * 2;
-		kptr4 += 8 * static_cast<ptrdiff_t>(nns) * 2;
-		kptr5 += 8 * static_cast<ptrdiff_t>(nns) * 2;
-		kptr6 += 8 * static_cast<ptrdiff_t>(nns) * 2;
-		kptr7 += 8 * static_cast<ptrdiff_t>(nns) * 2;
-	}
-	for (ptrdiff_t nn = 0; nn < nns * 2; nn += 16) {
-		__m512 accum = _mm512_load_ps(output + nn);
-		accum = _mm512_fmadd_ps(_mm512_set1_ps(scale), accum, _mm512_load_ps(bias + nn));
-		_mm512_store_ps(output + nn, accum);
-	}
+	__m128 tmp0 = _mm_rsqrt_ss(x);
+	__m128 tmp1 = _mm_mul_ss(x, tmp0);
+	__m128 tmp2 = _mm_mul_ss(_mm_set_ss(0.5f), tmp0);
+	__m128 tmp3 = _mm_fnmadd_ss(tmp1, tmp0, _mm_set_ss(3.0f));
+	return _mm_mul_ss(tmp2, tmp3);
 }
 
 inline FORCE_INLINE __m512 mm512_expf_ps(__m512 x)
 {
-	constexpr float exp2f_x_plus1_remez[5] = {
-		0.509871020343597804469416f,
-		0.312146713032169896138863f,
-		0.166617139319965966118107f,
-		-2.19061993049215080032874e-3f,
-		1.3555747234758484073940937e-2f
-	};
-	constexpr float ln2_inv_scaled = 12102203.1615614f;
-	constexpr float one_scaled = 1065353216.f;
-	// constexpr float inf_scaled = 2139095040.f;
-
 	__m512 i, f;
 
 	x = _mm512_fmadd_ps(_mm512_set1_ps(EXPF_LN2_INV_SCALED), x, _mm512_set1_ps(EXPF_ONE_SCALED));
@@ -220,15 +65,168 @@ inline FORCE_INLINE __m512 mm512_expf_ps(__m512 x)
 	return _mm512_mul_ps(i, x);
 }
 
+inline FORCE_INLINE __m512 mm512_elliott_ps(__m512 x)
+{
+	const __m512i mask = _mm512_set1_epi32(UINT32_MAX >> 1);
+
+	__m512 den = _mm512_and_ps(x, _mm512_castsi512_ps(mask));
+	den = _mm512_add_ps(den, _mm512_set1_ps(1.0f));
+
+	return _mm512_div_ps(x, den);
+}
+
+inline FORCE_INLINE void gather_pixels_avx512(const float *src, ptrdiff_t src_stride, ptrdiff_t xdim, ptrdiff_t ydim, float *buf, double inv_size, float mstd[4])
+{
+	ptrdiff_t src_stride_f = src_stride / sizeof(float);
+
+	__m512d sum = _mm512_setzero_pd();
+	__m512d sumsq = _mm512_setzero_pd();
+
+	for (ptrdiff_t i = 0; i < ydim; ++i) {
+		for (ptrdiff_t j = 0; j < xdim; j += 8) {
+			__m256 val = _mm256_loadu_ps(src + j);
+
+			__m512d vald = _mm512_cvtps_pd(val);
+			sum = _mm512_add_pd(sum, vald);
+			sumsq = _mm512_fmadd_pd(vald, vald, sumsq);
+
+			_mm256_store_ps(buf + j, val);
+		}
+		src += src_stride_f;
+		buf += xdim;
+	}
+
+	// Get horizontal sums.
+	__m128d hsum = mm512_horizontal_sum2_pd(sum, sumsq);
+	hsum = _mm_mul_pd(hsum, _mm_set1_pd(inv_size));
+
+	__m128d sum_reduced = hsum;
+	__m128d sumsq_reduced = _mm_permute_pd(hsum, 1);
+
+	__m128d variance = _mm_fnmadd_pd(sum_reduced, sum_reduced, sumsq_reduced);
+	__m128d epsilon_mask = _mm_cmp_sd(variance, _mm_set_sd(FLT_EPSILON), _CMP_GE_OQ);
+
+	__m128 variance_f32 = _mm_cvtsd_ss(_mm_undefined_ps(), variance);
+	__m128 stddev_inv = mm_rsqrt24_ss(variance_f32);
+	__m128 stddev = _mm_mul_ss(stddev_inv, variance_f32);
+
+	stddev_inv = _mm_and_ps(_mm_castpd_ps(epsilon_mask), stddev_inv);
+	stddev = _mm_and_ps(_mm_castpd_ps(epsilon_mask), stddev);
+
+	mstd[0] = static_cast<float>(_mm_cvtsd_f64(sum_reduced));
+	mstd[1] = _mm_cvtss_f32(stddev);
+	mstd[2] = _mm_cvtss_f32(stddev_inv);
+	mstd[3] = 0.0f;
+}
+
+inline FORCE_INLINE void interleaved_convolution_avx512(const float *kernels, const float *input, unsigned nns, unsigned n, float *output, float scale, const float *bias)
+{
+	const float *kptr0_base = kernels;
+	const float *kptr1_base = kernels + 16;
+	ptrdiff_t kstride = static_cast<ptrdiff_t>(nns) * 2;
+
+	for (unsigned nn = 0; nn < nns * 2; nn += 32) {
+		_mm512_store_ps(output + nn + 0, _mm512_setzero_ps());
+		_mm512_store_ps(output + nn + 16, _mm512_setzero_ps());
+	}
+	for (ptrdiff_t k = 0; k < n; k += 8) {
+		__m512 x0 = _mm512_set1_ps(input[k + 0]);
+		__m512 x1 = _mm512_set1_ps(input[k + 1]);
+		__m512 x2 = _mm512_set1_ps(input[k + 2]);
+		__m512 x3 = _mm512_set1_ps(input[k + 3]);
+		__m512 x4 = _mm512_set1_ps(input[k + 4]);
+		__m512 x5 = _mm512_set1_ps(input[k + 5]);
+		__m512 x6 = _mm512_set1_ps(input[k + 6]);
+		__m512 x7 = _mm512_set1_ps(input[k + 7]);
+
+		const float *kptr0 = kptr0_base;
+		const float *kptr1 = kptr1_base;
+
+		for (ptrdiff_t nn = 0; nn < nns * 2; nn += 32) {
+			__m512 n00_15_a = _mm512_load_ps(output + nn);
+			__m512 n16_31_a = _mm512_load_ps(output + nn + 16);
+			__m512 n00_15_b = _mm512_setzero_ps();
+			__m512 n16_31_b = _mm512_setzero_ps();
+			__m512 c;
+
+			c = _mm512_load_ps(kptr0 + 0 * kstride);
+			n00_15_a = _mm512_fmadd_ps(c, x0, n00_15_a);
+
+			c = _mm512_load_ps(kptr1 + 0 * kstride);
+			n16_31_a = _mm512_fmadd_ps(c, x0, n16_31_a);
+
+			c = _mm512_load_ps(kptr0 + 1 * kstride);
+			n00_15_b = _mm512_fmadd_ps(c, x1, n00_15_b);
+
+			c = _mm512_load_ps(kptr1 + 1 * kstride);
+			n16_31_b = _mm512_fmadd_ps(c, x1, n16_31_b);
+
+			c = _mm512_load_ps(kptr0 + 2 * kstride);
+			n00_15_a = _mm512_fmadd_ps(c, x2, n00_15_a);
+
+			c = _mm512_load_ps(kptr1 + 2 * kstride);
+			n16_31_a = _mm512_fmadd_ps(c, x2, n16_31_a);
+
+			c = _mm512_load_ps(kptr0 + 3 * kstride);
+			n00_15_b = _mm512_fmadd_ps(c, x3, n00_15_b);
+
+			c = _mm512_load_ps(kptr1 + 3 * kstride);
+			n16_31_b = _mm512_fmadd_ps(c, x3, n16_31_b);
+
+			c = _mm512_load_ps(kptr0 + 4 * kstride);
+			n00_15_a = _mm512_fmadd_ps(c, x4, n00_15_a);
+
+			c = _mm512_load_ps(kptr1 + 4 * kstride);
+			n16_31_a = _mm512_fmadd_ps(c, x4, n16_31_a);
+
+			c = _mm512_load_ps(kptr0 + 5 * kstride);
+			n00_15_b = _mm512_fmadd_ps(c, x5, n00_15_b);
+
+			c = _mm512_load_ps(kptr1 + 5 * kstride);
+			n16_31_b = _mm512_fmadd_ps(c, x5, n16_31_b);
+
+			c = _mm512_load_ps(kptr0 + 6 * kstride);
+			n00_15_a = _mm512_fmadd_ps(c, x6, n00_15_a);
+
+			c = _mm512_load_ps(kptr1 + 6 * kstride);
+			n16_31_a = _mm512_fmadd_ps(c, x6, n16_31_a);
+
+			c = _mm512_load_ps(kptr0 + 7 * kstride);
+			n00_15_b = _mm512_fmadd_ps(c, x7, n00_15_b);
+
+			c = _mm512_load_ps(kptr1 + 7 * kstride);
+			n16_31_b = _mm512_fmadd_ps(c, x7, n16_31_b);
+
+			n00_15_a = _mm512_add_ps(n00_15_a, n00_15_b);
+			n16_31_a = _mm512_add_ps(n16_31_a, n16_31_b);
+
+			_mm512_store_ps(output + nn, n00_15_a);
+			_mm512_store_ps(output + nn + 16, n16_31_a);
+
+			kptr0 += 32;
+			kptr1 += 32;
+		}
+		kptr0_base += 8 * kstride;
+		kptr1_base += 8 * kstride;
+	}
+	for (ptrdiff_t nn = 0; nn < nns * 2; nn += 16) {
+		__m512 accum = _mm512_load_ps(output + nn);
+		accum = _mm512_fmadd_ps(_mm512_set1_ps(scale), accum, _mm512_load_ps(bias + nn));
+		_mm512_store_ps(output + nn, accum);
+	}
+}
+
 inline FORCE_INLINE void softmax_exp(float *ptr, unsigned n)
 {
-	const __m512 exp_min = _mm512_set1_ps(-80.0f);
+	const __m512 abs_mask = _mm512_castsi512_ps(_mm512_set1_epi32(UINT32_MAX >> 1));
 	const __m512 exp_max = _mm512_set1_ps(80.0f);
 
 	for (unsigned i = 0; i < n; i += 16) {
 		__m512 x = _mm512_load_ps(ptr + i);
-		x = _mm512_max_ps(x, exp_min);
-		x = _mm512_min_ps(x, exp_max);
+		__m512 xabs = _mm512_and_ps(abs_mask, x);
+		__m512 xsign = _mm512_andnot_ps(abs_mask, x);
+		x = _mm512_min_ps(xabs, exp_max);
+		x = _mm512_or_ps(xsign, x);
 		x = mm512_expf_ps(x);
 		_mm512_store_ps(ptr + i, x);
 	}
@@ -248,13 +246,19 @@ inline FORCE_INLINE void wae5(const float *softmax, const float *elliott, unsign
 		wsum = _mm512_add_ps(wsum, s);
 	}
 
-	float vsum_reduced = mm512_horizontal_sum_ps(vsum);
-	float wsum_rediced = mm512_horizontal_sum_ps(wsum);
+	__m128 packed = mm512_horizontal_sum2_ps(vsum, wsum);
 
-	if (wsum_rediced > 1e-10f)
-		mstd[3] += (5.0f * vsum_reduced) / wsum_rediced * mstd[1] + mstd[0];
-	else
-		mstd[3] += mstd[0];
+	__m128 vsum_reduced = packed;
+	__m128 wsum_reduced = _mm_permute_ps(packed, _MM_SHUFFLE(2, 3, 0, 1));
+	__m128 mask = _mm_cmp_ss(wsum_reduced, _mm_set_ss(1e-10f), _CMP_GT_OQ);
+
+	vsum_reduced = _mm_mul_ss(vsum_reduced, _mm_set_ss(5.0f));
+	vsum_reduced = _mm_div_ss(vsum_reduced, wsum_reduced);
+
+	vsum_reduced = _mm_fmadd_ss(_mm_set_ss(mstd[1]), vsum_reduced, _mm_set_ss(mstd[0]));
+	vsum_reduced = _mm_blendv_ps(_mm_set_ss(mstd[0]), vsum_reduced, mask);
+
+	mstd[3] += _mm_cvtss_f32(vsum_reduced);
 }
 
 class PredictorAVX512 final : public Predictor {
@@ -297,7 +301,6 @@ public:
 				const float *neurons = q ? m_model.neurons_q2 : m_model.neurons_q1;
 				const float *bias = q ? m_model.bias_q2 : m_model.bias_q1;
 
-				zero_memory_avx512(activation, nns * 2);
 				interleaved_convolution_avx512(neurons, input, nns, filter_size, activation, scale, bias);
 
 				softmax_exp(activation, nns);
