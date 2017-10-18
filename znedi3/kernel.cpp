@@ -65,7 +65,6 @@ void cubic_interpolation_c(const void *src, ptrdiff_t src_stride, void *dst, con
 	ptrdiff_t src_stride_f = src_stride / sizeof(float);
 
 	const float *window = src_p - 2 * src_stride_f;
-	const float k1 = 3.0f / 32.0f;
 
 	for (unsigned i = 0; i < n; ++i) {
 		if (!prescreen[i])
@@ -321,6 +320,10 @@ pixel_io_func select_pixel_io_func(PixelType in, PixelType out, CPUClass cpu)
 interpolate_func select_interpolate_func(CPUClass cpu)
 {
 	interpolate_func ret = nullptr;
+
+#ifdef ZNEDI3_X86
+	ret = select_interpolate_func_x86(cpu);
+#endif
 
 	if (!ret)
 		ret = cubic_interpolation_c;

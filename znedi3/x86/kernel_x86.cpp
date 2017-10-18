@@ -95,6 +95,26 @@ pixel_io_func select_pixel_io_func_x86(PixelType in, PixelType out, CPUClass cpu
 	return ret;
 }
 
+interpolate_func select_interpolate_func_x86(CPUClass cpu)
+{
+	X86Capabilities caps = query_x86_capabilities();
+	interpolate_func ret = nullptr;
+
+	if (cpu_is_autodetect(cpu)) {
+#ifdef ZNEDI3_X86_AVX512
+		if (!ret && cpu == CPUClass::AUTO_64B && caps.avx512f)
+			ret = cubic_interpolation_avx512f;
+#endif
+	} else {
+#ifdef ZNEDI3_X86_AVX512
+		if (!ret && cpu >= CPUClass::X86_AVX512)
+			ret = cubic_interpolation_avx512f;
+#endif
+	}
+
+	return ret;
+}
+
 std::unique_ptr<Prescreener> create_prescreener_old_x86(const PrescreenerOldCoefficients &coeffs, double pixel_half, CPUClass cpu)
 {
 	X86Capabilities caps = query_x86_capabilities();

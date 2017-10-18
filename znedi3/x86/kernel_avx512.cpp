@@ -822,69 +822,107 @@ public:
 } // namespace
 
 
+void cubic_interpolation_avx512f(const void *src, ptrdiff_t src_stride, void *dst, const unsigned char *prescreen, unsigned n)
+{
+	const float *src_p = static_cast<const float *>(src);
+	float *dst_p = static_cast<float *>(dst);
+	ptrdiff_t src_stride_f = src_stride / sizeof(float);
+
+	const float *src_p0 = src_p - 2 * src_stride_f;
+	const float *src_p1 = src_p - 1 * src_stride_f;
+	const float *src_p2 = src_p + 0 * src_stride_f;
+	const float *src_p3 = src_p + 1 * src_stride_f;
+
+	const __m512 k0 = _mm512_set1_ps(-3.0f / 32.0f);
+	const __m512 k1 = _mm512_set1_ps(19.0f / 32.0f);
+
+	for (unsigned i = 0; i < n - (n % 16); i += 16) {
+		__m512i pmask = _mm512_cvtepi8_epi32(_mm_load_si128((const __m128i *)(prescreen + i)));
+		__mmask16 mask = _mm512_cmp_epi32_mask(pmask, _mm512_setzero_si512(), _MM_CMPINT_NE);
+
+		__m512 accum = _mm512_maskz_mul_ps(mask, k0, _mm512_load_ps(src_p0 + i));
+		accum = _mm512_maskz_fmadd_ps(mask, k1, _mm512_load_ps(src_p1 + i), accum);
+		accum = _mm512_maskz_fmadd_ps(mask, k1, _mm512_load_ps(src_p2 + i), accum);
+		accum = _mm512_maskz_fmadd_ps(mask, k0, _mm512_load_ps(src_p3 + i), accum);
+
+		_mm512_mask_store_ps(dst_p + i, mask, accum);
+	}
+	if (n % 16) {
+		__m512i pmask = _mm512_cvtepi8_epi32(_mm_load_si128((const __m128i *)(prescreen + (n - n % 16))));
+		__mmask16 mask = _mm512_cmp_epi32_mask(pmask, _mm512_setzero_si512(), _MM_CMPINT_NE) & (UINT16_MAX >> (16 - n % 16));
+
+		__m512 accum = _mm512_maskz_mul_ps(mask, k0, _mm512_load_ps(src_p0 + (n - n % 16)));
+		accum = _mm512_maskz_fmadd_ps(mask, k1, _mm512_load_ps(src_p1 + (n - n % 16)), accum);
+		accum = _mm512_maskz_fmadd_ps(mask, k1, _mm512_load_ps(src_p2 + (n - n % 16)), accum);
+		accum = _mm512_maskz_fmadd_ps(mask, k0, _mm512_load_ps(src_p3 + (n - n % 16)), accum);
+
+		_mm512_mask_store_ps(dst_p + (n - n % 16), mask, accum);
+	}
+}
+
 void byte_to_float_avx512f(const void *src, void *dst, size_t n)
 {
 	const uint8_t *src_p = static_cast<const uint8_t *>(src);
 	float *dst_p = static_cast<float *>(dst);
-	__m512i x;
 
 	for (size_t i = 0; i < n - n % 16; i += 16) {
-		x = _mm512_cvtepu8_epi32(_mm_load_si128((const __m128i *)(src_p + i)));
+		__m512i x = _mm512_cvtepu8_epi32(_mm_load_si128((const __m128i *)(src_p + i)));
 		_mm512_store_ps(dst_p + i, _mm512_cvtepi32_ps(x));
 	}
-
-	x = _mm512_cvtepu8_epi32(_mm_load_si128((const __m128i *)(src_p + (n - n % 16))));
-	_mm512_mask_store_ps(dst_p + (n - n % 16), UINT16_MAX >> (16 - n % 16), _mm512_cvtepi32_ps(x));
+	if (n % 16) {
+		__m512i x = _mm512_cvtepu8_epi32(_mm_load_si128((const __m128i *)(src_p + (n - n % 16))));
+		_mm512_mask_store_ps(dst_p + (n - n % 16), UINT16_MAX >> (16 - n % 16), _mm512_cvtepi32_ps(x));
+	}
 }
 
 void word_to_float_avx512f(const void *src, void *dst, size_t n)
 {
 	const uint16_t *src_p = static_cast<const uint16_t *>(src);
 	float *dst_p = static_cast<float *>(dst);
-	__m512i x;
 
 	for (size_t i = 0; i < n - n % 16; i += 16) {
-		x = _mm512_cvtepu16_epi32(_mm256_load_si256((const __m256i *)(src_p + i)));
+		__m512i x = _mm512_cvtepu16_epi32(_mm256_load_si256((const __m256i *)(src_p + i)));
 		_mm512_store_ps(dst_p + i, _mm512_cvtepi32_ps(x));
 	}
-
-	x = _mm512_cvtepu16_epi32(_mm256_load_si256((const __m256i *)(src_p + (n - n % 16))));
-	_mm512_mask_store_ps(dst_p + (n - n % 16), UINT16_MAX >> (16 - n % 16), _mm512_cvtepi32_ps(x));
+	if (n % 16) {
+		__m512i x = _mm512_cvtepu16_epi32(_mm256_load_si256((const __m256i *)(src_p + (n - n % 16))));
+		_mm512_mask_store_ps(dst_p + (n - n % 16), UINT16_MAX >> (16 - n % 16), _mm512_cvtepi32_ps(x));
+	}
 }
 
 void half_to_float_avx512f(const void *src, void *dst, size_t n)
 {
 	const uint16_t *src_p = static_cast<const uint16_t *>(src);
 	float *dst_p = static_cast<float *>(dst);
-	__m512 x;
 
 	for (size_t i = 0; i < n - n % 16; i += 16) {
-		x = _mm512_cvtph_ps(_mm256_load_si256((const __m256i *)(src_p + i)));
+		__m512 x = _mm512_cvtph_ps(_mm256_load_si256((const __m256i *)(src_p + i)));
 		_mm512_store_ps(dst_p + i, x);
 	}
-
-	x = _mm512_cvtph_ps(_mm256_load_si256((const __m256i *)(src_p + (n - n % 16))));
-	_mm512_mask_store_ps(dst_p + (n - n % 16), UINT16_MAX >> (16 - n % 16), x);
+	if (n % 16) {
+		__m512 x = _mm512_cvtph_ps(_mm256_load_si256((const __m256i *)(src_p + (n - n % 16))));
+		_mm512_mask_store_ps(dst_p + (n - n % 16), UINT16_MAX >> (16 - n % 16), x);
+	}
 }
 
 void float_to_byte_avx512f(const void *src, void *dst, size_t n)
 {
 	const float *src_p = static_cast<const float *>(src);
 	uint8_t *dst_p = static_cast<uint8_t *>(dst);
-	__m512i x;
 
 	for (size_t i = 0; i < n - n % 16; i += 16) {
-		x = _mm512_cvtps_epu32(_mm512_load_ps(src_p + i));
+		__m512i x = _mm512_cvtps_epu32(_mm512_load_ps(src_p + i));
 		_mm_store_si128((__m128i *)(dst_p + i), _mm512_cvtusepi32_epi8(x));
 	}
+	if (n % 16) {
+		// 8-bit mask granularity requires AVX-512 BW.
+		alignas(16) uint8_t tmp[16];
+		__m512i x = _mm512_cvtps_epu32(_mm512_load_ps(src_p + (n - n % 16)));
+		_mm_store_si128((__m128i *)tmp, _mm512_cvtusepi32_epi8(x));
 
-	// 8-bit mask granularity requires AVX-512 BW.
-	alignas(16) uint8_t tmp[16];
-	x = _mm512_cvtps_epu32(_mm512_load_ps(src_p + (n - n % 16)));
-	_mm_store_si128((__m128i *)tmp, _mm512_cvtusepi32_epi8(x));
-
-	for (size_t i = n - n % 16; i < n; ++i) {
-		dst_p[i] = tmp[i % 16];
+		for (size_t i = n - n % 16; i < n; ++i) {
+			dst_p[i] = tmp[i % 16];
+		}
 	}
 }
 
@@ -892,20 +930,20 @@ void float_to_word_avx512f(const void *src, void *dst, size_t n)
 {
 	const float *src_p = static_cast<const float *>(src);
 	uint16_t *dst_p = static_cast<uint16_t *>(dst);
-	__m512i x;
 
 	for (size_t i = 0; i < n - n % 16; i += 16) {
-		x = _mm512_cvtps_epu32(_mm512_load_ps(src_p + i));
+		__m512i x = _mm512_cvtps_epu32(_mm512_load_ps(src_p + i));
 		_mm256_store_si256((__m256i *)(dst_p + i), _mm512_cvtusepi32_epi16(x));
 	}
+	if (n % 16) {
+		// 16-bit mask granularity requires AVX-512 BW.
+		alignas(32) uint16_t tmp[16];
+		__m512i x = _mm512_cvtps_epu32(_mm512_load_ps(src_p + (n - n % 16)));
+		_mm256_store_si256((__m256i *)tmp, _mm512_cvtusepi32_epi16(x));
 
-	// 16-bit mask granularity requires AVX-512 BW.
-	alignas(32) uint16_t tmp[16];
-	x = _mm512_cvtps_epu32(_mm512_load_ps(src_p + (n - n % 16)));
-	_mm256_store_si256((__m256i *)tmp, _mm512_cvtusepi32_epi16(x));
-
-	for (size_t i = n - n % 16; i < n; ++i) {
-		dst_p[i] = tmp[i % 16];
+		for (size_t i = n - n % 16; i < n; ++i) {
+			dst_p[i] = tmp[i % 16];
+		}
 	}
 }
 
@@ -913,20 +951,20 @@ void float_to_half_avx512f(const void *src, void *dst, size_t n)
 {
 	const float *src_p = static_cast<const float *>(src);
 	uint16_t *dst_p = static_cast<uint16_t *>(dst);
-	__m256i x;
 
 	for (size_t i = 0; i < n - n % 16; i += 16) {
-		x = _mm512_cvtps_ph(_mm512_load_ps(src_p + i), 0);
+		__m256i x = _mm512_cvtps_ph(_mm512_load_ps(src_p + i), 0);
 		_mm256_store_si256((__m256i *)(dst_p + i), x);
 	}
+	if (n % 16) {
+		// 16-bit mask granularity requires AVX-512 BW.
+		alignas(32) uint16_t tmp[16];
+		__m256i x = _mm512_cvtps_ph(_mm512_load_ps(src_p + (n - n % 16)), 0);
+		_mm256_store_si256((__m256i *)tmp, x);
 
-	// 16-bit mask granularity requires AVX-512 BW.
-	alignas(32) uint16_t tmp[16];
-	x = _mm512_cvtps_ph(_mm512_load_ps(src_p + (n - n % 16)), 0);
-	_mm256_store_si256((__m256i *)tmp, x);
-
-	for (size_t i = n - n % 16; i < n; ++i) {
-		dst_p[i] = tmp[i % 16];
+		for (size_t i = n - n % 16; i < n; ++i) {
+			dst_p[i] = tmp[i % 16];
+		}
 	}
 }
 
