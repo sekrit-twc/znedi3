@@ -7,6 +7,7 @@
 #include "argparse.h"
 #include "timer.h"
 #include "win32_bitmap.h"
+#include "alloc.h"
 #include "znedi3.h"
 
 namespace {
@@ -20,7 +21,7 @@ struct FreeFilter {
 };
 
 struct PlanarImage {
-	std::vector<unsigned char> data[3];
+	znedi3::AlignedVector<unsigned char> data[3];
 	ptrdiff_t stride[3];
 	unsigned width[3];
 	unsigned height[3];
@@ -115,7 +116,7 @@ constexpr ArgparseCommandLine program_cmd = {
 
 void execute(const Arguments &args, const znedi3_filter *filter, const PlanarImage &in, PlanarImage &out)
 {
-	std::vector<unsigned char> tmp(znedi3_filter_get_tmp_size(filter, in.width[0], in.height[0] / 2));
+	znedi3::AlignedVector<unsigned char> tmp(znedi3_filter_get_tmp_size(filter, in.width[0], in.height[0] / 2));
 
 	std::pair<double, double> results = measure_benchmark(args.times, [&]()
 	{
