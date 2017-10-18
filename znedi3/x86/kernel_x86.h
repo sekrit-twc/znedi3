@@ -65,11 +65,13 @@ void float_to_byte_avx512f(const void *src, void *dst, size_t n);
 void float_to_word_avx512f(const void *src, void *dst, size_t n);
 void float_to_half_avx512f(const void *src, void *dst, size_t n);
 
+std::unique_ptr<Prescreener> create_prescreener_old_avx512f(const PrescreenerOldCoefficients &coeffs, double pixel_half);
 std::unique_ptr<Predictor> create_predictor_avx512f(const std::pair<const PredictorTraits, PredictorCoefficients> &model, bool use_q2);
 
 
 pixel_io_func select_pixel_io_func_x86(PixelType in, PixelType out, CPUClass cpu);
 
+std::unique_ptr<Prescreener> create_prescreener_old_x86(const PrescreenerOldCoefficients &coeffs, double pixel_half, CPUClass cpu);
 std::unique_ptr<Predictor> create_predictor_x86(const std::pair<const PredictorTraits, PredictorCoefficients> &model, bool use_q2, CPUClass cpu);
 
 } // namespace znedi3

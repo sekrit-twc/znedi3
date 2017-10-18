@@ -85,7 +85,7 @@ void cubic_interpolation_c(const void *src, ptrdiff_t src_stride, void *dst, con
 class PrescreenerOldC final : public Prescreener {
 	PrescreenerOldCoefficients m_data;
 public:
-	explicit PrescreenerOldC(const PrescreenerOldCoefficients &data, double half) :
+	PrescreenerOldC(const PrescreenerOldCoefficients &data, double half) :
 		m_data(data)
 	{
 		subtract_mean(m_data, half);
@@ -142,7 +142,7 @@ class PrescreenerNewC final : public Prescreener {
 		}
 	}
 public:
-	explicit PrescreenerNewC(const PrescreenerNewCoefficients &data, double half) :
+	PrescreenerNewC(const PrescreenerNewCoefficients &data, double half) :
 		m_data(data)
 	{
 		subtract_mean(m_data, half);
@@ -332,6 +332,10 @@ interpolate_func select_interpolate_func(CPUClass cpu)
 std::unique_ptr<Prescreener> create_prescreener_old(const PrescreenerOldCoefficients &coeffs, double pixel_half, CPUClass cpu)
 {
 	std::unique_ptr<Prescreener> ret;
+
+#ifdef ZNEDI3_X86
+	ret = create_prescreener_old_x86(coeffs, pixel_half, cpu);
+#endif
 
 	if (!ret)
 		ret = std::make_unique<PrescreenerOldC>(coeffs, pixel_half);

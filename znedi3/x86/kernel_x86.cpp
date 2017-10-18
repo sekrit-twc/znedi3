@@ -33,7 +33,6 @@ pixel_io_func select_pixel_io_func_avx512f(PixelType in, PixelType out)
 
 } // namespace
 
-
 InterleavedPredictorModel create_interleaved_predictor_model(const std::pair<const PredictorTraits, PredictorCoefficients> &model)
 {
 	assert(model.first.nns % 16 == 0);
@@ -83,13 +82,33 @@ pixel_io_func select_pixel_io_func_x86(PixelType in, PixelType out, CPUClass cpu
 
 	if (cpu_is_autodetect(cpu)) {
 #ifdef ZNEDI3_X86_AVX512
-		if (!ret && cpu == CPUClass::AUTO_64B && caps.avx512f && caps.avx512bw && caps.avx512vl)
+		if (!ret && cpu == CPUClass::AUTO_64B && caps.avx512f)
 			ret = select_pixel_io_func_avx512f(in, out);
 #endif
 	} else {
 #ifdef ZNEDI3_X86_AVX512
 		if (!ret && cpu >= CPUClass::X86_AVX512)
 			ret = select_pixel_io_func_avx512f(in, out);
+#endif
+	}
+
+	return ret;
+}
+
+std::unique_ptr<Prescreener> create_prescreener_old_x86(const PrescreenerOldCoefficients &coeffs, double pixel_half, CPUClass cpu)
+{
+	X86Capabilities caps = query_x86_capabilities();
+	std::unique_ptr<Prescreener> ret;
+
+	if (cpu_is_autodetect(cpu)) {
+#ifdef ZNEDI3_X86_AVX512
+		if (!ret && cpu == CPUClass::AUTO_64B && caps.avx512f)
+			ret = create_prescreener_old_avx512f(coeffs, pixel_half);
+#endif
+	} else {
+#ifdef ZNEDI3_X86_AVX512
+		if (!ret && cpu >= CPUClass::X86_AVX512)
+			ret = create_prescreener_old_avx512f(coeffs, pixel_half);
 #endif
 	}
 
