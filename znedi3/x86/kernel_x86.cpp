@@ -135,6 +135,26 @@ std::unique_ptr<Prescreener> create_prescreener_old_x86(const PrescreenerOldCoef
 	return ret;
 }
 
+std::unique_ptr<Prescreener> create_prescreener_new_x86(const PrescreenerNewCoefficients &coeffs, double pixel_half, CPUClass cpu)
+{
+	X86Capabilities caps = query_x86_capabilities();
+	std::unique_ptr<Prescreener> ret;
+
+	if (cpu_is_autodetect(cpu)) {
+#ifdef ZNEDI3_X86_AVX512
+		if (!ret && cpu == CPUClass::AUTO_64B && caps.avx512f)
+			ret = create_prescreener_new_avx512f(coeffs, pixel_half);
+#endif
+	} else {
+#ifdef ZNEDI3_X86_AVX512
+		if (!ret && cpu >= CPUClass::X86_AVX512)
+			ret = create_prescreener_new_avx512f(coeffs, pixel_half);
+#endif
+	}
+
+	return ret;
+}
+
 std::unique_ptr<Predictor> create_predictor_x86(const std::pair<const PredictorTraits, PredictorCoefficients> &model, bool use_q2, CPUClass cpu)
 {
 	X86Capabilities caps = query_x86_capabilities();

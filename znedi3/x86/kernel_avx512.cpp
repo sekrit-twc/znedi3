@@ -433,6 +433,228 @@ public:
 };
 
 
+// Applies a 4x4 transpose to each 128-bit lane.
+inline FORCE_INLINE void mm512_transpose4_4x4_ps(__m512 &a, __m512 &b, __m512 &c, __m512 &d)
+{
+	__m512 t0 = _mm512_shuffle_ps(a, b, 0x44);
+	__m512 t1 = _mm512_shuffle_ps(c, d, 0x44);
+	__m512 t2 = _mm512_shuffle_ps(a, b, 0xEE);
+	__m512 t3 = _mm512_shuffle_ps(c, d, 0xEE);
+	a = _mm512_shuffle_ps(t0, t1, 0x88);
+	b = _mm512_shuffle_ps(t0, t1, 0xDD);
+	c = _mm512_shuffle_ps(t2, t3, 0x88);
+	d = _mm512_shuffle_ps(t2, t3, 0xDD);
+}
+
+// Transpose a 4x4 matrix of packed 128-bit elements.
+inline FORCE_INLINE void mm512_transpose4_ps128(__m512 &a, __m512 &b, __m512 &c, __m512 &d)
+{
+	__m512 t0 = _mm512_shuffle_f32x4(a, b, 0x44);
+	__m512 t1 = _mm512_shuffle_f32x4(c, d, 0x44);
+	__m512 t2 = _mm512_shuffle_f32x4(a, b, 0xEE);
+	__m512 t3 = _mm512_shuffle_f32x4(c, d, 0xEE);
+	a = _mm512_shuffle_f32x4(t0, t1, 0x88);
+	b = _mm512_shuffle_f32x4(t0, t1, 0xDD);
+	c = _mm512_shuffle_f32x4(t2, t3, 0x88);
+	d = _mm512_shuffle_f32x4(t2, t3, 0xDD);
+}
+
+class PrescreenerNewAVX512F final : public Prescreener {
+	AlignedVector<PrescreenerNewCoefficients> m_data;
+public:
+	PrescreenerNewAVX512F(const PrescreenerNewCoefficients &data, double half) :
+		m_data(1, data)
+	{
+		subtract_mean(m_data[0], half);
+	}
+
+	void process(const void *src, ptrdiff_t src_stride, unsigned char *prescreen, unsigned n) const override
+	{
+		const float *src_p = static_cast<const float *>(src);
+		ptrdiff_t src_stride_f = src_stride / sizeof(float);
+
+		// Adjust source pointer to point to top-left of filter window.
+		const float *window = src_p - 2 * src_stride_f - 6;
+
+		const __m512 l0_c00 = _mm512_load_ps(m_data[0].kernel_l0[0] + 0);
+		const __m512 l0_c01 = _mm512_load_ps(m_data[0].kernel_l0[0] + 16);
+		const __m512 l0_c02 = _mm512_load_ps(m_data[0].kernel_l0[0] + 32);
+		const __m512 l0_c03 = _mm512_load_ps(m_data[0].kernel_l0[0] + 48);
+
+		const __m512 l0_c10 = _mm512_load_ps(m_data[0].kernel_l0[1] + 0);
+		const __m512 l0_c11 = _mm512_load_ps(m_data[0].kernel_l0[1] + 16);
+		const __m512 l0_c12 = _mm512_load_ps(m_data[0].kernel_l0[1] + 32);
+		const __m512 l0_c13 = _mm512_load_ps(m_data[0].kernel_l0[1] + 48);
+
+		const __m512 l0_c20 = _mm512_load_ps(m_data[0].kernel_l0[2] + 0);
+		const __m512 l0_c21 = _mm512_load_ps(m_data[0].kernel_l0[2] + 16);
+		const __m512 l0_c22 = _mm512_load_ps(m_data[0].kernel_l0[2] + 32);
+		const __m512 l0_c23 = _mm512_load_ps(m_data[0].kernel_l0[2] + 48);
+
+		const __m512 l0_c30 = _mm512_load_ps(m_data[0].kernel_l0[3] + 0);
+		const __m512 l0_c31 = _mm512_load_ps(m_data[0].kernel_l0[3] + 16);
+		const __m512 l0_c32 = _mm512_load_ps(m_data[0].kernel_l0[3] + 32);
+		const __m512 l0_c33 = _mm512_load_ps(m_data[0].kernel_l0[3] + 48);
+
+		for (unsigned j = 0; j < n; j += 16) {
+			// Layer 1.
+			__m512 x0, x1, x2, x3;
+			__m512 partial0, partial1, partial2, partial3;
+			__m512 tmp0, tmp1, tmp2, tmp3;
+
+			// Pixels [0-3].
+			x0 = _mm512_loadu_ps(window + 0 * src_stride_f + j + 0);
+			x1 = _mm512_loadu_ps(window + 1 * src_stride_f + j + 0);
+			x2 = _mm512_loadu_ps(window + 2 * src_stride_f + j + 0);
+			x3 = _mm512_loadu_ps(window + 3 * src_stride_f + j + 0);
+
+			tmp0 = _mm512_mul_ps(l0_c00, x0);
+			tmp0 = _mm512_fmadd_ps(l0_c01, x1, tmp0);
+			tmp0 = _mm512_fmadd_ps(l0_c02, x2, tmp0);
+			tmp0 = _mm512_fmadd_ps(l0_c03, x3, tmp0);
+
+			tmp1 = _mm512_mul_ps(l0_c10, x0);
+			tmp1 = _mm512_fmadd_ps(l0_c11, x1, tmp1);
+			tmp1 = _mm512_fmadd_ps(l0_c12, x2, tmp1);
+			tmp1 = _mm512_fmadd_ps(l0_c13, x3, tmp1);
+
+			tmp2 = _mm512_mul_ps(l0_c20, x0);
+			tmp2 = _mm512_fmadd_ps(l0_c21, x1, tmp2);
+			tmp2 = _mm512_fmadd_ps(l0_c22, x2, tmp2);
+			tmp2 = _mm512_fmadd_ps(l0_c23, x3, tmp2);
+
+			tmp3 = _mm512_mul_ps(l0_c30, x0);
+			tmp3 = _mm512_fmadd_ps(l0_c31, x1, tmp3);
+			tmp3 = _mm512_fmadd_ps(l0_c32, x2, tmp3);
+			tmp3 = _mm512_fmadd_ps(l0_c33, x3, tmp3);
+
+			mm512_transpose4_4x4_ps(tmp0, tmp1, tmp2, tmp3);
+			tmp0 = _mm512_add_ps(tmp0, tmp1);
+			tmp2 = _mm512_add_ps(tmp2, tmp3);
+			partial0 = _mm512_add_ps(tmp0, tmp2);
+
+			// Pixels [4-7].
+			x0 = _mm512_loadu_ps(window + 0 * src_stride_f + j + 4);
+			x1 = _mm512_loadu_ps(window + 1 * src_stride_f + j + 4);
+			x2 = _mm512_loadu_ps(window + 2 * src_stride_f + j + 4);
+			x3 = _mm512_loadu_ps(window + 3 * src_stride_f + j + 4);
+
+			tmp0 = _mm512_mul_ps(l0_c00, x0);
+			tmp0 = _mm512_fmadd_ps(l0_c01, x1, tmp0);
+			tmp0 = _mm512_fmadd_ps(l0_c02, x2, tmp0);
+			tmp0 = _mm512_fmadd_ps(l0_c03, x3, tmp0);
+
+			tmp1 = _mm512_mul_ps(l0_c10, x0);
+			tmp1 = _mm512_fmadd_ps(l0_c11, x1, tmp1);
+			tmp1 = _mm512_fmadd_ps(l0_c12, x2, tmp1);
+			tmp1 = _mm512_fmadd_ps(l0_c13, x3, tmp1);
+
+			tmp2 = _mm512_mul_ps(l0_c20, x0);
+			tmp2 = _mm512_fmadd_ps(l0_c21, x1, tmp2);
+			tmp2 = _mm512_fmadd_ps(l0_c22, x2, tmp2);
+			tmp2 = _mm512_fmadd_ps(l0_c23, x3, tmp2);
+
+			tmp3 = _mm512_mul_ps(l0_c30, x0);
+			tmp3 = _mm512_fmadd_ps(l0_c31, x1, tmp3);
+			tmp3 = _mm512_fmadd_ps(l0_c32, x2, tmp3);
+			tmp3 = _mm512_fmadd_ps(l0_c33, x3, tmp3);
+
+			mm512_transpose4_4x4_ps(tmp0, tmp1, tmp2, tmp3);
+			tmp0 = _mm512_add_ps(tmp0, tmp1);
+			tmp2 = _mm512_add_ps(tmp2, tmp3);
+			partial1 = _mm512_add_ps(tmp0, tmp2);
+
+			// Pixels [8-11].
+			x0 = _mm512_loadu_ps(window + 0 * src_stride_f + j + 8);
+			x1 = _mm512_loadu_ps(window + 1 * src_stride_f + j + 8);
+			x2 = _mm512_loadu_ps(window + 2 * src_stride_f + j + 8);
+			x3 = _mm512_loadu_ps(window + 3 * src_stride_f + j + 8);
+
+			tmp0 = _mm512_mul_ps(l0_c00, x0);
+			tmp0 = _mm512_fmadd_ps(l0_c01, x1, tmp0);
+			tmp0 = _mm512_fmadd_ps(l0_c02, x2, tmp0);
+			tmp0 = _mm512_fmadd_ps(l0_c03, x3, tmp0);
+
+			tmp1 = _mm512_mul_ps(l0_c10, x0);
+			tmp1 = _mm512_fmadd_ps(l0_c11, x1, tmp1);
+			tmp1 = _mm512_fmadd_ps(l0_c12, x2, tmp1);
+			tmp1 = _mm512_fmadd_ps(l0_c13, x3, tmp1);
+
+			tmp2 = _mm512_mul_ps(l0_c20, x0);
+			tmp2 = _mm512_fmadd_ps(l0_c21, x1, tmp2);
+			tmp2 = _mm512_fmadd_ps(l0_c22, x2, tmp2);
+			tmp2 = _mm512_fmadd_ps(l0_c23, x3, tmp2);
+
+			tmp3 = _mm512_mul_ps(l0_c30, x0);
+			tmp3 = _mm512_fmadd_ps(l0_c31, x1, tmp3);
+			tmp3 = _mm512_fmadd_ps(l0_c32, x2, tmp3);
+			tmp3 = _mm512_fmadd_ps(l0_c33, x3, tmp3);
+
+			mm512_transpose4_4x4_ps(tmp0, tmp1, tmp2, tmp3);
+			tmp0 = _mm512_add_ps(tmp0, tmp1);
+			tmp2 = _mm512_add_ps(tmp2, tmp3);
+			partial2 = _mm512_add_ps(tmp0, tmp2);
+
+			// Pixels [12-15].
+			x0 = _mm512_loadu_ps(window + 0 * src_stride_f + j + 12);
+			x1 = _mm512_loadu_ps(window + 1 * src_stride_f + j + 12);
+			x2 = _mm512_loadu_ps(window + 2 * src_stride_f + j + 12);
+			x3 = _mm512_loadu_ps(window + 3 * src_stride_f + j + 12);
+
+			tmp0 = _mm512_mul_ps(l0_c00, x0);
+			tmp0 = _mm512_fmadd_ps(l0_c01, x1, tmp0);
+			tmp0 = _mm512_fmadd_ps(l0_c02, x2, tmp0);
+			tmp0 = _mm512_fmadd_ps(l0_c03, x3, tmp0);
+
+			tmp1 = _mm512_mul_ps(l0_c10, x0);
+			tmp1 = _mm512_fmadd_ps(l0_c11, x1, tmp1);
+			tmp1 = _mm512_fmadd_ps(l0_c12, x2, tmp1);
+			tmp1 = _mm512_fmadd_ps(l0_c13, x3, tmp1);
+
+			tmp2 = _mm512_mul_ps(l0_c20, x0);
+			tmp2 = _mm512_fmadd_ps(l0_c21, x1, tmp2);
+			tmp2 = _mm512_fmadd_ps(l0_c22, x2, tmp2);
+			tmp2 = _mm512_fmadd_ps(l0_c23, x3, tmp2);
+
+			tmp3 = _mm512_mul_ps(l0_c30, x0);
+			tmp3 = _mm512_fmadd_ps(l0_c31, x1, tmp3);
+			tmp3 = _mm512_fmadd_ps(l0_c32, x2, tmp3);
+			tmp3 = _mm512_fmadd_ps(l0_c33, x3, tmp3);
+
+			mm512_transpose4_4x4_ps(tmp0, tmp1, tmp2, tmp3);
+			tmp0 = _mm512_add_ps(tmp0, tmp1);
+			tmp2 = _mm512_add_ps(tmp2, tmp3);
+			partial3 = _mm512_add_ps(tmp0, tmp2);
+
+			// Finish summing neurons.
+			mm512_transpose4_ps128(partial0, partial1, partial2, partial3);
+			partial0 = _mm512_add_ps(partial0, partial1);
+			partial2 = _mm512_add_ps(partial2, partial3);
+			partial0 = _mm512_add_ps(partial0, partial2);
+
+			__m512 activation_l0 = _mm512_add_ps(partial0, _mm512_broadcast_f32x4(_mm_load_ps(m_data[0].bias_l0)));
+			activation_l0 = mm512_elliott_ps(activation_l0);
+
+			// Layer 2.
+			tmp0 = _mm512_mul_ps(_mm512_broadcast_f32x4(_mm_load_ps(m_data[0].kernel_l1[0])), activation_l0);
+			tmp1 = _mm512_mul_ps(_mm512_broadcast_f32x4(_mm_load_ps(m_data[0].kernel_l1[1])), activation_l0);
+			tmp2 = _mm512_mul_ps(_mm512_broadcast_f32x4(_mm_load_ps(m_data[0].kernel_l1[2])), activation_l0);
+			tmp3 = _mm512_mul_ps(_mm512_broadcast_f32x4(_mm_load_ps(m_data[0].kernel_l1[3])), activation_l0);
+
+			mm512_transpose4_4x4_ps(tmp0, tmp1, tmp2, tmp3);
+			tmp0 = _mm512_add_ps(tmp0, tmp1);
+			tmp2 = _mm512_add_ps(tmp2, tmp3);
+			tmp0 = _mm512_add_ps(tmp0, tmp2);
+
+			__m512 activation_l1 = _mm512_add_ps(tmp0, _mm512_broadcast_f32x4(_mm_load_ps(m_data[0].bias_l1)));
+			__mmask16 result = _mm512_cmp_ps_mask(activation_l1, _mm512_setzero_ps(), _CMP_GT_OQ);
+			__m128i result_mask = _mm512_maskz_cvtusepi32_epi8(result, _mm512_set1_epi8(0xFFU));
+			_mm_store_si128((__m128i *)(prescreen + j), result_mask);
+		}
+	}
+};
+
+
 inline FORCE_INLINE void gather_pixels_avx512(const float *src, ptrdiff_t src_stride, ptrdiff_t xdim, ptrdiff_t ydim, float *buf, double inv_size, float mstd[4])
 {
 	ptrdiff_t src_stride_f = src_stride / sizeof(float);
@@ -972,6 +1194,11 @@ void float_to_half_avx512f(const void *src, void *dst, size_t n)
 std::unique_ptr<Prescreener> create_prescreener_old_avx512f(const PrescreenerOldCoefficients &coeffs, double pixel_half)
 {
 	return std::make_unique<PrescreenerOldAVX512F>(coeffs, pixel_half);
+}
+
+std::unique_ptr<Prescreener> create_prescreener_new_avx512f(const PrescreenerNewCoefficients &coeffs, double pixel_half)
+{
+	return std::make_unique<PrescreenerNewAVX512F>(coeffs, pixel_half);
 }
 
 std::unique_ptr<Predictor> create_predictor_avx512f(const std::pair<const PredictorTraits, PredictorCoefficients> &model, bool use_q2)

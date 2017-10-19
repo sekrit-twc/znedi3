@@ -351,6 +351,10 @@ std::unique_ptr<Prescreener> create_prescreener_new(const PrescreenerNewCoeffici
 {
 	std::unique_ptr<Prescreener> ret;
 
+#ifdef ZNEDI3_X86
+	ret = create_prescreener_new_x86(coeffs, pixel_half, cpu);
+#endif
+
 	if (!ret)
 		ret = std::make_unique<PrescreenerNewC>(coeffs, pixel_half);
 
