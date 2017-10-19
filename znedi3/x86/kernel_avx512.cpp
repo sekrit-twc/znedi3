@@ -415,20 +415,29 @@ public:
 		subtract_mean(m_data, half);
 	}
 
-	void process(const void *src, ptrdiff_t src_stride, unsigned char *prescreen, unsigned n) const override
+	size_t get_tmp_size() const override
 	{
+		return 9 * 512 * sizeof(float);
+	}
+
+	void process(const void *src, ptrdiff_t src_stride, unsigned char *prescreen, void *tmp, unsigned n) const override
+	{
+		float *activation = static_cast<float *>(tmp);
+		ptrdiff_t activation_stride = 512 * sizeof(float);
+
 		const float *src_p = static_cast<const float *>(src);
 		ptrdiff_t src_stride_f = src_stride / sizeof(float);
 
 		// Adjust source pointer to point to top-left of filter window.
 		const float *window = src_p - 2 * src_stride_f - 5;
 
-		ptrdiff_t activation_stride = ((n + 15) & ~15) * sizeof(float);
-		AlignedVector<float> activation(9 * (activation_stride / sizeof(float)));
+		for (unsigned i = 0; i < n; i += 512) {
+			unsigned nn = i + 512 > n ? n - i : 512;
 
-		prescreener_old_layer0_avx512(m_data.kernel_l0, m_data.bias_l0, window, src_stride, activation.data(), activation_stride, n);
-		prescreener_old_layer1_avx512(m_data.kernel_l1, m_data.bias_l1, activation.data(), activation_stride, n);
-		prescreener_old_layer2_avx512(m_data.kernel_l2, m_data.bias_l2, activation.data(), activation_stride, prescreen, n);
+			prescreener_old_layer0_avx512(m_data.kernel_l0, m_data.bias_l0, window + i, src_stride, activation, activation_stride, nn);
+			prescreener_old_layer1_avx512(m_data.kernel_l1, m_data.bias_l1, activation, activation_stride, nn);
+			prescreener_old_layer2_avx512(m_data.kernel_l2, m_data.bias_l2, activation, activation_stride, prescreen + i, nn);
+		}
 	}
 };
 
@@ -468,7 +477,9 @@ public:
 		subtract_mean(m_data[0], half);
 	}
 
-	void process(const void *src, ptrdiff_t src_stride, unsigned char *prescreen, unsigned n) const override
+	size_t get_tmp_size() const override { return 0; }
+
+	void process(const void *src, ptrdiff_t src_stride, unsigned char *prescreen, void *, unsigned n) const override
 	{
 		const float *src_p = static_cast<const float *>(src);
 		ptrdiff_t src_stride_f = src_stride / sizeof(float);
@@ -1001,7 +1012,9 @@ public:
 		assert(model.first.xdim * model.first.ydim <= 48 * 6);
 	}
 
-	void process(const void *src, ptrdiff_t src_stride, void *dst, const unsigned char *prescreen, unsigned n) const override
+	size_t get_tmp_size() const override { return 0; }
+
+	void process(const void *src, ptrdiff_t src_stride, void *dst, const unsigned char *prescreen, void *, unsigned n) const override
 	{
 		const float *src_p = static_cast<const float *>(src);
 		float *dst_p = static_cast<float *>(dst);

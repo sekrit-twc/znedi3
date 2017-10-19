@@ -90,7 +90,9 @@ public:
 		subtract_mean(m_data, half);
 	}
 
-	void process(const void *src, ptrdiff_t src_stride, unsigned char *prescreen, unsigned n) const override
+	size_t get_tmp_size() const override { return 0; }
+
+	void process(const void *src, ptrdiff_t src_stride, unsigned char *prescreen, void *, unsigned n) const override
 	{
 		const float *src_p = static_cast<const float *>(src);
 		ptrdiff_t src_stride_f = src_stride / sizeof(float);
@@ -147,7 +149,9 @@ public:
 		subtract_mean(m_data, half);
 	}
 
-	void process(const void *src, ptrdiff_t src_stride, unsigned char *prescreen, unsigned n) const override
+	size_t get_tmp_size() const override { return 0; }
+
+	void process(const void *src, ptrdiff_t src_stride, unsigned char *prescreen, void *, unsigned n) const override
 	{
 		const float *src_p = static_cast<const float *>(src);
 		ptrdiff_t src_stride_f = src_stride / sizeof(float);
@@ -245,7 +249,9 @@ public:
 		subtract_mean(m_model);
 	}
 
-	void process(const void *src, ptrdiff_t src_stride, void *dst, const unsigned char *prescreen, unsigned n) const override
+	size_t get_tmp_size() const override { return 0; }
+
+	void process(const void *src, ptrdiff_t src_stride, void *dst, const unsigned char *prescreen, void *, unsigned n) const override
 	{
 		const float *src_p = static_cast<const float *>(src);
 		float *dst_p = static_cast<float *>(dst);

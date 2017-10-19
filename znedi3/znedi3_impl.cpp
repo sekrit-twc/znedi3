@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cassert>
 #include <cmath>
 #include <cstddef>
@@ -158,13 +159,34 @@ znedi3_filter::znedi3_filter(const NNEDI3Weights &weights, const znedi3_filter_p
 
 size_t znedi3_filter::get_tmp_size(unsigned width, unsigned height) const
 {
-	return 0;
+	FakeAllocator alloc;
+
+	ptrdiff_t pad_stride = ceil_n((width + 64) * sizeof(float), ALIGNMENT);
+	alloc.allocate(pad_stride * (height + 6));
+
+	ptrdiff_t dst_tmp_stride = ceil_n(width * sizeof(float), ALIGNMENT);
+	alloc.allocate(dst_tmp_stride * height);
+
+	size_t delegate_size = 0;
+	if (m_prescreener)
+		delegate_size = std::max(delegate_size, m_prescreener->get_tmp_size());
+	if (m_predictor)
+		delegate_size = std::max(delegate_size, m_predictor->get_tmp_size());
+
+	alloc.allocate(delegate_size);
+
+	// Prescreener mask.
+	alloc.allocate(ceil_n(width + 16, ALIGNMENT));
+
+	return alloc.count();
 }
 
 void znedi3_filter::process(unsigned width, unsigned height, const void *src, ptrdiff_t src_stride, void *dst, ptrdiff_t dst_stride, void *tmp, unsigned parity) const
 {
 	assert(static_cast<uintmax_t>(width) < static_cast<uintmax_t>(PTRDIFF_MAX));
 	assert(static_cast<uintmax_t>(height) < static_cast<uintmax_t>(PTRDIFF_MAX));
+
+	LinearAllocator alloc{ tmp };
 
 	ptrdiff_t width_d = width;
 	ptrdiff_t height_d = height;
@@ -173,62 +195,63 @@ void znedi3_filter::process(unsigned width, unsigned height, const void *src, pt
 	assert(height_d < PTRDIFF_MAX - 6);
 
 	// Create padded image.
-	AlignedVector<float> pad;
-
 	ptrdiff_t pad_stride = ceil_n((width + 64) * sizeof(float), ALIGNMENT);
 	ptrdiff_t pad_stride_f = pad_stride / sizeof(float);
-	pad.resize(pad_stride_f * (height + 6));
+	float *pad = alloc.allocate_n<float>(pad_stride_f * (height + 6));
 
-	float *pad_p = pad.data() + 3 * pad_stride_f + 32;
+	// Adjust padded pointer to (0, 0) coordinate.
+	pad += 3 * pad_stride_f + 32;
 
 	for (ptrdiff_t i = 0; i < height_d; ++i) {
-		m_pixel_load_func(static_cast<const unsigned char *>(src) + i * src_stride, pad_p + i * pad_stride_f, width);
+		m_pixel_load_func(static_cast<const unsigned char *>(src) + i * src_stride, pad + i * pad_stride_f, width);
 
-		for (ptrdiff_t j = -32; j < 0; ++j) {
-			pad_p[i * pad_stride_f + j] = pad_p[i * pad_stride_f];
-		}
-		for (ptrdiff_t j = width_d; j < width_d + 32; ++j) {
-			pad_p[i * pad_stride_f + j] = pad_p[i * pad_stride_f + (width_d - 1)];
-		}
+		std::fill_n(pad + i * pad_stride_f - 32, 32, pad[i * pad_stride_f]);
+		std::fill_n(pad + i * pad_stride_f + width_d, 32, pad[i * pad_stride_f + (width_d - 1)]);
 	}
 	for (ptrdiff_t i = -3; i < 0; ++i) {
-		std::copy_n(pad_p - 32, width_d + 64, pad_p + i * pad_stride_f - 32);
+		std::copy_n(pad - 32, width_d + 64, pad + i * pad_stride_f - 32);
 	}
 	for (ptrdiff_t i = height_d; i < height_d + 3; ++i) {
-		std::copy_n(pad_p + (height_d - 1) * pad_stride_f - 32, width_d + 64, pad_p + i * pad_stride_f - 32);
+		std::copy_n(pad + (height_d - 1) * pad_stride_f - 32, width_d + 64, pad + i * pad_stride_f - 32);
 	}
 
 	// Create temporary destination image.
-	AlignedVector<float> dst_tmp;
 	ptrdiff_t dst_tmp_stride_f = ceil_n(width_d, ALIGNMENT / sizeof(float));
+	float *dst_tmp = alloc.allocate_n<float>(dst_tmp_stride_f * height_d);;
 
-	dst_tmp.resize(dst_tmp_stride_f * height_d);
-	float *dst_tmp_p = dst_tmp.data();
+	// Allocate delegate temporary buffer.
+	size_t delegate_size = 0;
+
+	if (m_prescreener)
+		delegate_size = std::max(delegate_size, m_prescreener->get_tmp_size());
+	if (m_predictor)
+		delegate_size = std::max(delegate_size, m_predictor->get_tmp_size());
+
+	void *delegate_tmp = alloc.allocate(delegate_size);
 
 	// Initialize pointers. Set the source pointer to the row below the current output row.
-	const float *src_p = pad_p + (parity ? pad_stride_f : 0);
-	float *dst_p = dst_tmp_p;
-	ptrdiff_t src_p_stride_f = pad_stride_f;
-	ptrdiff_t dst_p_stride_f = dst_tmp_stride_f;
+	if (parity)
+		pad += pad_stride_f;
 
 	// Main loop.
-	AlignedVector<unsigned char> prescreen(ceil_n(width_d + 4, ALIGNMENT));
+	float *dst_tmp_p = dst_tmp;
+	unsigned char *prescreen = alloc.allocate_n<unsigned char>(ceil_n(width + 16, ALIGNMENT));
 
 	for (ptrdiff_t i = 0; i < height_d; ++i) {
 		if (m_prescreener)
-			m_prescreener->process(src_p, src_p_stride_f * sizeof(float), prescreen.data(), width);
+			m_prescreener->process(pad, pad_stride, prescreen, delegate_tmp, width);
 		if (m_predictor)
-			m_predictor->process(src_p, src_p_stride_f * sizeof(float), dst_p, prescreen.data(), width);
+			m_predictor->process(pad, pad_stride, dst_tmp_p, prescreen, delegate_tmp, width);
 		if (m_prescreener)
-			m_interpolate_func(src_p, src_p_stride_f * sizeof(float), dst_p, prescreen.data(), width);
+			m_interpolate_func(pad, pad_stride, dst_tmp_p, prescreen, width);
 
-		src_p += src_p_stride_f;
-		dst_p += dst_p_stride_f;
+		pad += pad_stride_f;
+		dst_tmp_p += dst_tmp_stride_f;
 	}
 
 	// Copy temporary image to output.
 	for (ptrdiff_t i = 0; i < height_d; ++i) {
-		m_pixel_store_func(dst_tmp_p + i * dst_tmp_stride_f, static_cast<unsigned char *>(dst) + i * dst_stride, width);
+		m_pixel_store_func(dst_tmp + i * dst_tmp_stride_f, static_cast<unsigned char *>(dst) + i * dst_stride, width);
 	}
 }
 

@@ -20,14 +20,18 @@ class Prescreener {
 public:
 	virtual ~Prescreener() = default;
 
-	virtual void process(const void *src, ptrdiff_t src_stride, unsigned char *prescreen, unsigned n) const = 0;
+	virtual size_t get_tmp_size() const = 0;
+
+	virtual void process(const void *src, ptrdiff_t src_stride, unsigned char *prescreen, void *tmp, unsigned n) const = 0;
 };
 
 class Predictor {
 public:
 	virtual ~Predictor() = default;
 
-	virtual void process(const void *src, ptrdiff_t src_stride, void *dst, const unsigned char *prescreen, unsigned n) const = 0;
+	virtual size_t get_tmp_size() const = 0;
+
+	virtual void process(const void *src, ptrdiff_t src_stride, void *dst, const unsigned char *prescreen, void *tmp, unsigned n) const = 0;
 };
 
 pixel_io_func select_pixel_io_func(PixelType in, PixelType out, CPUClass cpu);
