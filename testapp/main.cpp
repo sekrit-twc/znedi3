@@ -70,6 +70,38 @@ void planar_to_bitmap(const PlanarImage &planar, WindowsBitmap &bmp)
 	}
 }
 
+
+int arg_decode_cpu(const ArgparseOption *, void *out, const char *param, int)
+{
+	int *cpu = static_cast<int *>(out);
+
+#define ELSE_IF(str, e) else if (!strcmp(param, str)) do { *cpu = e; } while (0)
+
+	if (!strcmp(param, "none"))
+		*cpu = ZNEDI3_CPU_NONE;
+	else if (!strcmp(param, "auto"))
+		*cpu = ZNEDI3_CPU_AUTO_64B;
+#if defined(__i386) || defined(_M_IX86) || defined(_M_X64) || defined(__x86_64__)
+	ELSE_IF("mmx", ZNEDI3_CPU_X86_MMX);
+	ELSE_IF("sse", ZNEDI3_CPU_X86_SSE);
+	ELSE_IF("sse2", ZNEDI3_CPU_X86_SSE2);
+	ELSE_IF("sse3", ZNEDI3_CPU_X86_SSE3);
+	ELSE_IF("ssse3", ZNEDI3_CPU_X86_SSSE3);
+	ELSE_IF("sse41", ZNEDI3_CPU_X86_SSE41);
+	ELSE_IF("sse42", ZNEDI3_CPU_X86_SSE42);
+	ELSE_IF("avx", ZNEDI3_CPU_X86_AVX);
+	ELSE_IF("f16c", ZNEDI3_CPU_X86_F16C);
+	ELSE_IF("avx", ZNEDI3_CPU_X86_AVX);
+	ELSE_IF("avx2", ZNEDI3_CPU_X86_AVX2);
+	ELSE_IF("avx512f", ZNEDI3_CPU_X86_AVX512F);
+	ELSE_IF("avx512_skl", ZNEDI3_CPU_X86_AVX512_SKL);
+#endif
+	else
+		std::cerr << "unrecognized CPU type: " << param;
+
+	return 0;
+}
+
 struct Arguments {
 	const char *weights;
 	const char *input;
@@ -79,6 +111,7 @@ struct Arguments {
 	int qual = -1;
 	int etype = -1;
 	int prescreen = -1;
+	int cpu = -1;
 	int show_mask = -1;
 	char top = 1;
 	char bottom = 1;
@@ -86,15 +119,16 @@ struct Arguments {
 };
 
 constexpr ArgparseOption program_switches[] = {
-	{ OPTION_INT,  "s",     "nsize",     offsetof(Arguments, nsize),     nullptr, "window size (0-6)" },
-	{ OPTION_INT,  "n",     "nns",       offsetof(Arguments, nns),       nullptr, "neuron size (0-4)" },
-	{ OPTION_INT,  "q",     "qual",      offsetof(Arguments, qual),      nullptr, "quality level (1-2)" },
-	{ OPTION_INT,  "e",     "etype",     offsetof(Arguments, etype),     nullptr, "error type (0-1)" },
-	{ OPTION_INT,  "p",     "prescreen", offsetof(Arguments, prescreen), nullptr, "prescreener (0-4)" },
-	{ OPTION_INT,  "m",     "show-mask", offsetof(Arguments, show_mask), nullptr, "show mask" },
-	{ OPTION_FLAG, "t",     "top",      offsetof(Arguments, top),       nullptr, "interpolate top field" },
-	{ OPTION_FLAG, "b",     "bottom",   offsetof(Arguments, bottom),    nullptr, "interpolate bottom field" },
-	{ OPTION_INT,  nullptr, "times",    offsetof(Arguments, times),     nullptr, "number of iterations" },
+	{ OPTION_INT,   "s",     "nsize",     offsetof(Arguments, nsize),     nullptr, "window size (0-6)" },
+	{ OPTION_INT,   "n",     "nns",       offsetof(Arguments, nns),       nullptr, "neuron size (0-4)" },
+	{ OPTION_INT,   "q",     "qual",      offsetof(Arguments, qual),      nullptr, "quality level (1-2)" },
+	{ OPTION_INT,   "e",     "etype",     offsetof(Arguments, etype),     nullptr, "error type (0-1)" },
+	{ OPTION_INT,   "p",     "prescreen", offsetof(Arguments, prescreen), nullptr, "prescreener (0-4)" },
+	{ OPTION_USER1, nullptr, "cpu",       offsetof(Arguments, cpu),       arg_decode_cpu, "cpu type" },
+	{ OPTION_INT,   "m",     "show-mask", offsetof(Arguments, show_mask), nullptr, "show mask" },
+	{ OPTION_FLAG,  "t",     "top",       offsetof(Arguments, top),       nullptr, "interpolate top field" },
+	{ OPTION_FLAG,  "b",     "bottom",    offsetof(Arguments, bottom),    nullptr, "interpolate bottom field" },
+	{ OPTION_INT,   nullptr, "times",     offsetof(Arguments, times),     nullptr, "number of iterations" },
 	{ OPTION_NULL },
 };
 
@@ -171,12 +205,12 @@ int main(int argc, char **argv)
 		};
 
 		params.pixel_type = ZNEDI_PIXEL_BYTE;
-		params.cpu = ZNEDI3_CPU_AUTO_64B;
 		propagate_if_set(params.nsize, args.nsize);
 		propagate_if_set(params.nns, args.nns);
 		propagate_if_set(params.qual, args.qual);
 		propagate_if_set(params.etype, args.etype);
 		propagate_if_set(params.prescreen, args.prescreen);
+		propagate_if_set(params.cpu, args.cpu);
 		propagate_if_set(params.show_mask, args.show_mask);
 
 		std::unique_ptr<znedi3_filter, FreeFilter> filter{ znedi3_filter_create(weights.get(), &params) };
