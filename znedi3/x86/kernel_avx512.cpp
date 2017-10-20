@@ -13,16 +13,6 @@
 namespace znedi3 {
 namespace {
 
-inline FORCE_INLINE __m128 mm512_horizontal_sum2_ps(__m512 x, __m512 y)
-{
-	__m256 stage1x = _mm256_add_ps(_mm512_castps512_ps256(x), _mm512_extractf32x8_ps(x, 1));
-	__m256 stage1y = _mm256_add_ps(_mm512_castps512_ps256(y), _mm512_extractf32x8_ps(y, 1));
-	__m256 stage2 = _mm256_hadd_ps(stage1x, stage1y);
-	__m256 stage3 = _mm256_hadd_ps(stage2, stage2);
-	__m128 stage4 = _mm_add_ps(_mm256_castps256_ps128(stage3), _mm256_extractf128_ps(stage3, 1));
-	return stage4;
-}
-
 inline FORCE_INLINE __m128d mm512_horizontal_sum2_pd(__m512d x, __m512d y)
 {
 	__m256d stage1x = _mm256_add_pd(_mm512_castpd512_pd256(x), _mm512_extractf64x4_pd(x, 1));
@@ -710,250 +700,81 @@ inline FORCE_INLINE void gather_pixels_avx512(const float *src, ptrdiff_t src_st
 	mstd[3] = 0.0f;
 }
 
-template <unsigned NNS>
-inline FORCE_INLINE void interleaved_convolution_avx512(const float *kernels, const float *input, unsigned nns, unsigned n, float *output, float scale, const float *bias)
+inline FORCE_INLINE void interleaved_convolution4_avx512(const float *neurons, const float *input, unsigned nns, unsigned filter_size,
+                                                         float *activation, const float *mstd, const float *bias)
 {
-	nns = NNS ? NNS : nns;
+	ptrdiff_t nstride = static_cast<ptrdiff_t>(nns) * 2;
+	float *activation_softmax = activation;
+	float *activation_elliott = activation + 4 * nns;
 
-	const float *kptr0_base = kernels;
-	const float *kptr1_base = kernels + 16;
-	ptrdiff_t kstride = static_cast<ptrdiff_t>(nns) * 2;
+	for (ptrdiff_t nn = 0; nn < static_cast<ptrdiff_t>(nns * 2); nn += 32) {
+		__m512 accum0a = _mm512_setzero_ps();
+		__m512 accum1a = _mm512_setzero_ps();
+		__m512 accum2a = _mm512_setzero_ps();
+		__m512 accum3a = _mm512_setzero_ps();
 
-	for (unsigned nn = 0; nn < nns * 2; nn += 32) {
-		_mm512_store_ps(output + nn + 0, _mm512_setzero_ps());
-		_mm512_store_ps(output + nn + 16, _mm512_setzero_ps());
-	}
-	for (ptrdiff_t k = 0; k < n; k += 8) {
-		__m512 x0 = _mm512_set1_ps(input[k + 0]);
-		__m512 x1 = _mm512_set1_ps(input[k + 1]);
-		__m512 x2 = _mm512_set1_ps(input[k + 2]);
-		__m512 x3 = _mm512_set1_ps(input[k + 3]);
-		__m512 x4 = _mm512_set1_ps(input[k + 4]);
-		__m512 x5 = _mm512_set1_ps(input[k + 5]);
-		__m512 x6 = _mm512_set1_ps(input[k + 6]);
-		__m512 x7 = _mm512_set1_ps(input[k + 7]);
+		__m512 accum0b = _mm512_setzero_ps();
+		__m512 accum1b = _mm512_setzero_ps();
+		__m512 accum2b = _mm512_setzero_ps();
+		__m512 accum3b = _mm512_setzero_ps();
 
-		const float *kptr0 = kptr0_base;
-		const float *kptr1 = kptr1_base;
+		for (ptrdiff_t i = 0; i < filter_size; ++i) {
+			__m512 x0 = _mm512_set1_ps(input[0 * filter_size + i]);
+			__m512 x1 = _mm512_set1_ps(input[1 * filter_size + i]);
+			__m512 x2 = _mm512_set1_ps(input[2 * filter_size + i]);
+			__m512 x3 = _mm512_set1_ps(input[3 * filter_size + i]);
+			__m512 coeffs;
 
-		for (ptrdiff_t nn = 0; nn < nns * 2; nn += 32) {
-			__m512 n00_15_a = _mm512_load_ps(output + nn);
-			__m512 n16_31_a = _mm512_load_ps(output + nn + 16);
-			__m512 n00_15_b = _mm512_setzero_ps();
-			__m512 n16_31_b = _mm512_setzero_ps();
-			__m512 c;
+			coeffs = _mm512_load_ps(neurons + i * nstride + nn + 0);
 
-			c = _mm512_load_ps(kptr0 + 0 * kstride);
-			n00_15_a = _mm512_fmadd_ps(c, x0, n00_15_a);
+			accum0a = _mm512_fmadd_ps(coeffs, x0, accum0a);
+			accum1a = _mm512_fmadd_ps(coeffs, x1, accum1a);
+			accum2a = _mm512_fmadd_ps(coeffs, x2, accum2a);
+			accum3a = _mm512_fmadd_ps(coeffs, x3, accum3a);
 
-			c = _mm512_load_ps(kptr1 + 0 * kstride);
-			n16_31_a = _mm512_fmadd_ps(c, x0, n16_31_a);
+			coeffs = _mm512_load_ps(neurons + i * nstride + nn + 16);
 
-			c = _mm512_load_ps(kptr0 + 1 * kstride);
-			n00_15_b = _mm512_fmadd_ps(c, x1, n00_15_b);
-
-			c = _mm512_load_ps(kptr1 + 1 * kstride);
-			n16_31_b = _mm512_fmadd_ps(c, x1, n16_31_b);
-
-			c = _mm512_load_ps(kptr0 + 2 * kstride);
-			n00_15_a = _mm512_fmadd_ps(c, x2, n00_15_a);
-
-			c = _mm512_load_ps(kptr1 + 2 * kstride);
-			n16_31_a = _mm512_fmadd_ps(c, x2, n16_31_a);
-
-			c = _mm512_load_ps(kptr0 + 3 * kstride);
-			n00_15_b = _mm512_fmadd_ps(c, x3, n00_15_b);
-
-			c = _mm512_load_ps(kptr1 + 3 * kstride);
-			n16_31_b = _mm512_fmadd_ps(c, x3, n16_31_b);
-
-			c = _mm512_load_ps(kptr0 + 4 * kstride);
-			n00_15_a = _mm512_fmadd_ps(c, x4, n00_15_a);
-
-			c = _mm512_load_ps(kptr1 + 4 * kstride);
-			n16_31_a = _mm512_fmadd_ps(c, x4, n16_31_a);
-
-			c = _mm512_load_ps(kptr0 + 5 * kstride);
-			n00_15_b = _mm512_fmadd_ps(c, x5, n00_15_b);
-
-			c = _mm512_load_ps(kptr1 + 5 * kstride);
-			n16_31_b = _mm512_fmadd_ps(c, x5, n16_31_b);
-
-			c = _mm512_load_ps(kptr0 + 6 * kstride);
-			n00_15_a = _mm512_fmadd_ps(c, x6, n00_15_a);
-
-			c = _mm512_load_ps(kptr1 + 6 * kstride);
-			n16_31_a = _mm512_fmadd_ps(c, x6, n16_31_a);
-
-			c = _mm512_load_ps(kptr0 + 7 * kstride);
-			n00_15_b = _mm512_fmadd_ps(c, x7, n00_15_b);
-
-			c = _mm512_load_ps(kptr1 + 7 * kstride);
-			n16_31_b = _mm512_fmadd_ps(c, x7, n16_31_b);
-
-			n00_15_a = _mm512_add_ps(n00_15_a, n00_15_b);
-			n16_31_a = _mm512_add_ps(n16_31_a, n16_31_b);
-
-			_mm512_store_ps(output + nn, n00_15_a);
-			_mm512_store_ps(output + nn + 16, n16_31_a);
-
-			kptr0 += 32;
-			kptr1 += 32;
+			accum0b = _mm512_fmadd_ps(coeffs, x0, accum0b);
+			accum1b = _mm512_fmadd_ps(coeffs, x1, accum1b);
+			accum2b = _mm512_fmadd_ps(coeffs, x2, accum2b);
+			accum3b = _mm512_fmadd_ps(coeffs, x3, accum3b);
 		}
-		kptr0_base += 8 * kstride;
-		kptr1_base += 8 * kstride;
-	}
-	for (ptrdiff_t nn = 0; nn < nns * 2; nn += 16) {
-		__m512 accum = _mm512_load_ps(output + nn);
-		accum = _mm512_fmadd_ps(_mm512_set1_ps(scale), accum, _mm512_load_ps(bias + nn));
-		_mm512_store_ps(output + nn, accum);
+
+		__m512 scale0 = _mm512_set1_ps(mstd[0 * 4 + 2]);
+		__m512 scale1 = _mm512_set1_ps(mstd[1 * 4 + 2]);
+		__m512 scale2 = _mm512_set1_ps(mstd[2 * 4 + 2]);
+		__m512 scale3 = _mm512_set1_ps(mstd[3 * 4 + 2]);
+		__m512 bias_ps;
+		float *dst;
+
+		bias_ps = _mm512_load_ps(bias + nn + 0);
+		accum0a = _mm512_fmadd_ps(scale0, accum0a, bias_ps);
+		accum1a = _mm512_fmadd_ps(scale1, accum1a, bias_ps);
+		accum2a = _mm512_fmadd_ps(scale2, accum2a, bias_ps);
+		accum3a = _mm512_fmadd_ps(scale3, accum3a, bias_ps);
+
+		dst = nn + 0 >= static_cast<ptrdiff_t>(nns) ? activation_elliott + (nn + 0) - static_cast<ptrdiff_t>(nns) : activation_softmax + nn + 0;
+		_mm512_store_ps(dst + 0 * static_cast<ptrdiff_t>(nns), accum0a);
+		_mm512_store_ps(dst + 1 * static_cast<ptrdiff_t>(nns), accum1a);
+		_mm512_store_ps(dst + 2 * static_cast<ptrdiff_t>(nns), accum2a);
+		_mm512_store_ps(dst + 3 * static_cast<ptrdiff_t>(nns), accum3a);
+
+		bias_ps = _mm512_load_ps(bias + nn + 16);
+		accum0b = _mm512_fmadd_ps(scale0, accum0b, bias_ps);
+		accum1b = _mm512_fmadd_ps(scale1, accum1b, bias_ps);
+		accum2b = _mm512_fmadd_ps(scale2, accum2b, bias_ps);
+		accum3b = _mm512_fmadd_ps(scale3, accum3b, bias_ps);
+
+		dst = nn + 16 >= static_cast<ptrdiff_t>(nns) ? activation_elliott + (nn + 16) - static_cast<ptrdiff_t>(nns) : activation_softmax + nn + 16;
+		_mm512_store_ps(dst + 0 * static_cast<ptrdiff_t>(nns), accum0b);
+		_mm512_store_ps(dst + 1 * static_cast<ptrdiff_t>(nns), accum1b);
+		_mm512_store_ps(dst + 2 * static_cast<ptrdiff_t>(nns), accum2b);
+		_mm512_store_ps(dst + 3 * static_cast<ptrdiff_t>(nns), accum3b);
 	}
 }
 
-template <>
-inline FORCE_INLINE void interleaved_convolution_avx512<16>(const float *kernels, const float *input, unsigned, unsigned n, float *output, float scale, const float *bias)
-{
-	__m512 accum0a = _mm512_setzero_ps();
-	__m512 accum1a = _mm512_setzero_ps();
-	__m512 accum0b = _mm512_setzero_ps();
-	__m512 accum1b = _mm512_setzero_ps();
-
-	for (ptrdiff_t k = 0; k < static_cast<ptrdiff_t>(n); k += 8) {
-		__m512 x0 = _mm512_set1_ps(input[k + 0]);
-		__m512 x1 = _mm512_set1_ps(input[k + 1]);
-		__m512 x2 = _mm512_set1_ps(input[k + 2]);
-		__m512 x3 = _mm512_set1_ps(input[k + 3]);
-		__m512 x4 = _mm512_set1_ps(input[k + 4]);
-		__m512 x5 = _mm512_set1_ps(input[k + 5]);
-		__m512 x6 = _mm512_set1_ps(input[k + 6]);
-		__m512 x7 = _mm512_set1_ps(input[k + 7]);
-
-		accum0a = _mm512_fmadd_ps(_mm512_load_ps(kernels + 0), x0, accum0a);
-		accum1a = _mm512_fmadd_ps(_mm512_load_ps(kernels + 16), x0, accum1a);
-
-		accum0b = _mm512_fmadd_ps(_mm512_load_ps(kernels + 32), x1, accum0b);
-		accum1b = _mm512_fmadd_ps(_mm512_load_ps(kernels + 48), x1, accum1b);
-
-		accum0a = _mm512_fmadd_ps(_mm512_load_ps(kernels + 64), x2, accum0a);
-		accum1a = _mm512_fmadd_ps(_mm512_load_ps(kernels + 80), x2, accum1a);
-
-		accum0b = _mm512_fmadd_ps(_mm512_load_ps(kernels + 96), x3, accum0b);
-		accum1b = _mm512_fmadd_ps(_mm512_load_ps(kernels + 112), x3, accum1b);
-
-		accum0a = _mm512_fmadd_ps(_mm512_load_ps(kernels + 128), x4, accum0a);
-		accum1a = _mm512_fmadd_ps(_mm512_load_ps(kernels + 144), x4, accum1a);
-
-		accum0b = _mm512_fmadd_ps(_mm512_load_ps(kernels + 160), x5, accum0b);
-		accum1b = _mm512_fmadd_ps(_mm512_load_ps(kernels + 176), x5, accum1b);
-
-		accum0a = _mm512_fmadd_ps(_mm512_load_ps(kernels + 192), x6, accum0a);
-		accum1a = _mm512_fmadd_ps(_mm512_load_ps(kernels + 208), x6, accum1a);
-
-		accum0b = _mm512_fmadd_ps(_mm512_load_ps(kernels + 224), x7, accum0b);
-		accum1b = _mm512_fmadd_ps(_mm512_load_ps(kernels + 240), x7, accum1b);
-
-		kernels += 256;
-	}
-
-	accum0a = _mm512_add_ps(accum0a, accum0b);
-	accum1a = _mm512_add_ps(accum1a, accum1b);
-
-	__m512 scale_ps = _mm512_set1_ps(scale);
-	accum0a = _mm512_fmadd_ps(scale_ps, accum0a, _mm512_load_ps(bias + 0));
-	accum1a = _mm512_fmadd_ps(scale_ps, accum1a, _mm512_load_ps(bias + 16));
-
-	_mm512_store_ps(output + 0, accum0a);
-	_mm512_store_ps(output + 16, accum1a);
-}
-
-template <>
-inline FORCE_INLINE void interleaved_convolution_avx512<32>(const float *kernels, const float *input, unsigned, unsigned n, float *output, float scale, const float *bias)
-{
-	__m512 accum0a = _mm512_setzero_ps();
-	__m512 accum1a = _mm512_setzero_ps();
-	__m512 accum2a = _mm512_setzero_ps();
-	__m512 accum3a = _mm512_setzero_ps();
-
-	__m512 accum0b = _mm512_setzero_ps();
-	__m512 accum1b = _mm512_setzero_ps();
-	__m512 accum2b = _mm512_setzero_ps();
-	__m512 accum3b = _mm512_setzero_ps();
-
-	for (ptrdiff_t k = 0; k < static_cast<ptrdiff_t>(n); k += 8) {
-		__m512 x0 = _mm512_set1_ps(input[k + 0]);
-		__m512 x1 = _mm512_set1_ps(input[k + 1]);
-		__m512 x2 = _mm512_set1_ps(input[k + 2]);
-		__m512 x3 = _mm512_set1_ps(input[k + 3]);
-		__m512 x4 = _mm512_set1_ps(input[k + 4]);
-		__m512 x5 = _mm512_set1_ps(input[k + 5]);
-		__m512 x6 = _mm512_set1_ps(input[k + 6]);
-		__m512 x7 = _mm512_set1_ps(input[k + 7]);
-
-		accum0a = _mm512_fmadd_ps(_mm512_load_ps(kernels + 0), x0, accum0a);
-		accum1a = _mm512_fmadd_ps(_mm512_load_ps(kernels + 16), x0, accum1a);
-		accum2a = _mm512_fmadd_ps(_mm512_load_ps(kernels + 32), x0, accum2a);
-		accum3a = _mm512_fmadd_ps(_mm512_load_ps(kernels + 48), x0, accum3a);
-
-		accum0b = _mm512_fmadd_ps(_mm512_load_ps(kernels + 64), x1, accum0b);
-		accum1b = _mm512_fmadd_ps(_mm512_load_ps(kernels + 80), x1, accum1b);
-		accum2b = _mm512_fmadd_ps(_mm512_load_ps(kernels + 96), x1, accum2b);
-		accum3b = _mm512_fmadd_ps(_mm512_load_ps(kernels + 112), x1, accum3b);
-
-		accum0a = _mm512_fmadd_ps(_mm512_load_ps(kernels + 128), x2, accum0a);
-		accum1a = _mm512_fmadd_ps(_mm512_load_ps(kernels + 144), x2, accum1a);
-		accum2a = _mm512_fmadd_ps(_mm512_load_ps(kernels + 160), x2, accum2a);
-		accum3a = _mm512_fmadd_ps(_mm512_load_ps(kernels + 176), x2, accum3a);
-
-		accum0b = _mm512_fmadd_ps(_mm512_load_ps(kernels + 192), x3, accum0b);
-		accum1b = _mm512_fmadd_ps(_mm512_load_ps(kernels + 208), x3, accum1b);
-		accum2b = _mm512_fmadd_ps(_mm512_load_ps(kernels + 224), x3, accum2b);
-		accum3b = _mm512_fmadd_ps(_mm512_load_ps(kernels + 240), x3, accum3b);
-
-		accum0a = _mm512_fmadd_ps(_mm512_load_ps(kernels + 256), x4, accum0a);
-		accum1a = _mm512_fmadd_ps(_mm512_load_ps(kernels + 272), x4, accum1a);
-		accum2a = _mm512_fmadd_ps(_mm512_load_ps(kernels + 288), x4, accum2a);
-		accum3a = _mm512_fmadd_ps(_mm512_load_ps(kernels + 304), x4, accum3a);
-
-		accum0b = _mm512_fmadd_ps(_mm512_load_ps(kernels + 320), x5, accum0b);
-		accum1b = _mm512_fmadd_ps(_mm512_load_ps(kernels + 336), x5, accum1b);
-		accum2b = _mm512_fmadd_ps(_mm512_load_ps(kernels + 352), x5, accum2b);
-		accum3b = _mm512_fmadd_ps(_mm512_load_ps(kernels + 368), x5, accum3b);
-
-		accum0a = _mm512_fmadd_ps(_mm512_load_ps(kernels + 384), x6, accum0a);
-		accum1a = _mm512_fmadd_ps(_mm512_load_ps(kernels + 400), x6, accum1a);
-		accum2a = _mm512_fmadd_ps(_mm512_load_ps(kernels + 416), x6, accum2a);
-		accum3a = _mm512_fmadd_ps(_mm512_load_ps(kernels + 432), x6, accum3a);
-
-		accum0b = _mm512_fmadd_ps(_mm512_load_ps(kernels + 448), x7, accum0b);
-		accum1b = _mm512_fmadd_ps(_mm512_load_ps(kernels + 464), x7, accum1b);
-		accum2b = _mm512_fmadd_ps(_mm512_load_ps(kernels + 480), x7, accum2b);
-		accum3b = _mm512_fmadd_ps(_mm512_load_ps(kernels + 496), x7, accum3b);
-
-		kernels += 512;
-	}
-
-	accum0a = _mm512_add_ps(accum0a, accum0b);
-	accum1a = _mm512_add_ps(accum1a, accum1b);
-	accum2a = _mm512_add_ps(accum2a, accum2b);
-	accum3a = _mm512_add_ps(accum3a, accum3b);
-
-	__m512 scale_ps = _mm512_set1_ps(scale);
-	accum0a = _mm512_fmadd_ps(scale_ps, accum0a, _mm512_load_ps(bias + 0));
-	accum1a = _mm512_fmadd_ps(scale_ps, accum1a, _mm512_load_ps(bias + 16));
-	accum2a = _mm512_fmadd_ps(scale_ps, accum2a, _mm512_load_ps(bias + 32));
-	accum3a = _mm512_fmadd_ps(scale_ps, accum3a, _mm512_load_ps(bias + 48));
-
-	_mm512_store_ps(output + 0, accum0a);
-	_mm512_store_ps(output + 16, accum1a);
-	_mm512_store_ps(output + 32, accum2a);
-	_mm512_store_ps(output + 48, accum3a);
-}
-
-template <unsigned NNS>
 inline FORCE_INLINE void softmax_exp(float *ptr, unsigned n)
 {
-	n = NNS ? NNS : n;
-
 	const __m512 abs_mask = _mm512_castsi512_ps(_mm512_set1_epi32(UINT32_MAX >> 1));
 	const __m512 exp_max = _mm512_set1_ps(80.0f);
 
@@ -968,42 +789,103 @@ inline FORCE_INLINE void softmax_exp(float *ptr, unsigned n)
 	}
 }
 
-template <unsigned NNS>
-inline FORCE_INLINE void wae5(const float *softmax, const float *elliott, unsigned n, float mstd[4])
+inline FORCE_INLINE void wae5_x4(const float *softmax, const float *elliott, unsigned n, float *mstd)
 {
-	n = NNS ? NNS : n;
+	__m512 vsum0 = _mm512_setzero_ps();
+	__m512 vsum1 = _mm512_setzero_ps();
+	__m512 vsum2 = _mm512_setzero_ps();
+	__m512 vsum3 = _mm512_setzero_ps();
 
-	__m512 vsum = _mm512_setzero_ps();
-	__m512 wsum = _mm512_setzero_ps();
+	__m512 wsum0 = _mm512_setzero_ps();
+	__m512 wsum1 = _mm512_setzero_ps();
+	__m512 wsum2 = _mm512_setzero_ps();
+	__m512 wsum3 = _mm512_setzero_ps();
 
-	for (unsigned i = 0; i < n; i += 16) {
-		__m512 s = _mm512_load_ps(softmax + i);
-		__m512 e = _mm512_load_ps(elliott + i);
-		__m512 ee = mm512_elliott_ps(e);
+	for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(n); i += 16) {
+		__m512 s0 = _mm512_load_ps(softmax + 0 * static_cast<ptrdiff_t>(n) + i);
+		__m512 s1 = _mm512_load_ps(softmax + 1 * static_cast<ptrdiff_t>(n) + i);
+		__m512 s2 = _mm512_load_ps(softmax + 2 * static_cast<ptrdiff_t>(n) + i);
+		__m512 s3 = _mm512_load_ps(softmax + 3 * static_cast<ptrdiff_t>(n) + i);
 
-		vsum = _mm512_fmadd_ps(s, ee, vsum);
-		wsum = _mm512_add_ps(wsum, s);
+		__m512 e0 = _mm512_load_ps(elliott + 0 * static_cast<ptrdiff_t>(n) + i);
+		__m512 e1 = _mm512_load_ps(elliott + 1 * static_cast<ptrdiff_t>(n) + i);
+		__m512 e2 = _mm512_load_ps(elliott + 2 * static_cast<ptrdiff_t>(n) + i);
+		__m512 e3 = _mm512_load_ps(elliott + 3 * static_cast<ptrdiff_t>(n) + i);
+
+		e0 = mm512_elliott_ps(e0);
+		e1 = mm512_elliott_ps(e1);
+		e2 = mm512_elliott_ps(e2);
+		e3 = mm512_elliott_ps(e3);
+
+		vsum0 = _mm512_fmadd_ps(s0, e0, vsum0);
+		vsum1 = _mm512_fmadd_ps(s1, e1, vsum1);
+		vsum2 = _mm512_fmadd_ps(s2, e2, vsum2);
+		vsum3 = _mm512_fmadd_ps(s3, e3, vsum3);
+
+		wsum0 = _mm512_add_ps(wsum0, s0);
+		wsum1 = _mm512_add_ps(wsum1, s1);
+		wsum2 = _mm512_add_ps(wsum2, s2);
+		wsum3 = _mm512_add_ps(wsum3, s3);
 	}
 
-	__m128 packed = mm512_horizontal_sum2_ps(vsum, wsum);
+	mm512_transpose4_4x4_ps(vsum0, vsum1, vsum2, vsum3);
+	vsum0 = _mm512_add_ps(vsum0, vsum1);
+	vsum2 = _mm512_add_ps(vsum2, vsum3);
+	vsum0 = _mm512_add_ps(vsum0, vsum2);
 
-	__m128 vsum_reduced = packed;
-	__m128 wsum_reduced = _mm_permute_ps(packed, _MM_SHUFFLE(2, 3, 0, 1));
-	__m128 mask = _mm_cmp_ss(wsum_reduced, _mm_set_ss(1e-10f), _CMP_GT_OQ);
+	__m256 vsum_reduced_256 = _mm256_add_ps(_mm512_castps512_ps256(vsum0), _mm512_extractf32x8_ps(vsum0, 1));
+	__m128 vsum_reduced = _mm_add_ps(_mm256_castps256_ps128(vsum_reduced_256), _mm256_extractf128_ps(vsum_reduced_256, 1));
 
-	vsum_reduced = _mm_mul_ss(vsum_reduced, _mm_set_ss(5.0f));
-	vsum_reduced = _mm_div_ss(vsum_reduced, wsum_reduced);
+	mm512_transpose4_4x4_ps(wsum0, wsum1, wsum2, wsum3);
+	wsum0 = _mm512_add_ps(wsum0, wsum1);
+	wsum2 = _mm512_add_ps(wsum2, wsum3);
+	wsum0 = _mm512_add_ps(wsum0, wsum2);
 
-	vsum_reduced = _mm_fmadd_ss(_mm_set_ss(mstd[1]), vsum_reduced, _mm_set_ss(mstd[0]));
-	vsum_reduced = _mm_blendv_ps(_mm_set_ss(mstd[0]), vsum_reduced, mask);
+	__m256 wsum_reduced_256 = _mm256_add_ps(_mm512_castps512_ps256(wsum0), _mm512_extractf32x8_ps(wsum0, 1));
+	__m128 wsum_reduced = _mm_add_ps(_mm256_castps256_ps128(wsum_reduced_256), _mm256_extractf128_ps(wsum_reduced_256, 1));
 
-	mstd[3] += _mm_cvtss_f32(vsum_reduced);
+	__m128 mask = _mm_cmp_ps(wsum_reduced, _mm_set_ps1(1e-10f), _CMP_GT_OQ);
+
+	// Gather mstd[0] and mstd[1].
+	__m512 mstd_ps = _mm512_permutexvar_ps(_mm512_set_epi32(15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0), _mm512_load_ps(mstd));
+	__m128 mstd0 = _mm512_castps512_ps128(mstd_ps);
+	__m128 mstd1 = _mm512_extractf32x4_ps(mstd_ps, 1);
+	__m128 mstd3 = _mm512_extractf32x4_ps(mstd_ps, 3);
+
+	vsum_reduced = _mm_mul_ps(vsum_reduced, _mm_set_ps1(5.0f));
+	vsum_reduced = _mm_div_ps(vsum_reduced, wsum_reduced);
+	vsum_reduced = _mm_fmadd_ps(mstd1, vsum_reduced, mstd0);
+	vsum_reduced = _mm_blendv_ps(mstd0, vsum_reduced, mask);
+
+	mstd3 = _mm_add_ps(mstd3, vsum_reduced);
+	_mm_store_ss(mstd + 0 * 4 + 3, mstd3);
+	_mm_store_ss(mstd + 1 * 4 + 3, _mm_permute_ps(mstd3, _MM_SHUFFLE(3, 2, 1, 1)));
+	_mm_store_ss(mstd + 2 * 4 + 3, _mm_permute_ps(mstd3, _MM_SHUFFLE(3, 2, 1, 2)));
+	_mm_store_ss(mstd + 3 * 4 + 3, _mm_permute_ps(mstd3, _MM_SHUFFLE(3, 2, 1, 3)));
 }
 
-template <unsigned NNS>
+
 class PredictorAVX512F final : public Predictor {
 	InterleavedPredictorModel m_model;
 	bool m_use_q2;
+
+	void apply_model(float *input, float *activation, float *mstd) const
+	{
+		unsigned filter_size = m_model.xdim * m_model.ydim;
+		unsigned nns = m_model.nns;
+
+		float *activation_softmax = activation;
+		float *activation_elliott = activation + 4 * nns;
+
+		for (unsigned q = 0; q < (m_use_q2 ? 2U : 1U); ++q) {
+			const float *neurons = q ? m_model.neurons_q2 : m_model.neurons_q1;
+			const float *bias = q ? m_model.bias_q2 : m_model.bias_q1;
+
+			interleaved_convolution4_avx512(neurons, input, nns, filter_size, activation, mstd, bias);
+			softmax_exp(activation_softmax, 4 * nns);
+			wae5_x4(activation_softmax, activation_elliott, nns, mstd);
+		}
+	}
 public:
 	PredictorAVX512F(const PredictorModel &model, bool use_q2) :
 		m_model(create_interleaved_predictor_model(model)),
@@ -1012,10 +894,21 @@ public:
 		assert(model.first.xdim * model.first.ydim <= 48 * 6);
 	}
 
-	size_t get_tmp_size() const override { return 0; }
-
-	void process(const void *src, ptrdiff_t src_stride, void *dst, const unsigned char *prescreen, void *, unsigned n) const override
+	size_t get_tmp_size() const override
 	{
+		FakeAllocator alloc;
+
+		alloc.allocate_n<float>(48 * 6 * 4);
+		alloc.allocate_n<float>(256 * 2 * 4);
+		alloc.allocate_n<float>(4 * 4);
+
+		return alloc.count();
+	}
+
+	void process(const void *src, ptrdiff_t src_stride, void *dst, const unsigned char *prescreen, void *tmp, unsigned n) const override
+	{
+		LinearAllocator alloc{ tmp };
+
 		const float *src_p = static_cast<const float *>(src);
 		float *dst_p = static_cast<float *>(dst);
 		ptrdiff_t src_stride_f = src_stride / sizeof(float);
@@ -1023,33 +916,40 @@ public:
 		// Adjust source pointer to point to top-left of filter window.
 		const float *window = src_p - static_cast<ptrdiff_t>(m_model.ydim / 2) * src_stride_f - (m_model.xdim / 2 - 1);
 		unsigned filter_size = m_model.xdim * m_model.ydim;
-		unsigned nns = m_model.nns;
 
 		double inv_filter_size = 1.0 / filter_size;
+
+		float *input = alloc.allocate_n<float>(48 * 6 * 4);
+		float *activation = alloc.allocate_n<float>(256 * 2 * 4);
+		float *mstd = alloc.allocate_n<float>(4 * 4);
+		unsigned gathered_idx[4];
+		unsigned num_gathered = 0;
 
 		for (unsigned i = 0; i < n; ++i) {
 			if (prescreen[i])
 				continue;
 
-			alignas(64) float input[48 * 6];
-			alignas(64) float activation[256 * 2];
-			alignas(64) float mstd[4];
+			gather_pixels_avx512(window + i, src_stride, m_model.xdim, m_model.ydim, input + num_gathered * filter_size, inv_filter_size, mstd + num_gathered * 4);
+			gathered_idx[num_gathered] = i;
+			++num_gathered;
 
-			// gather_input(window + i, src_stride, input, mstd);
-			gather_pixels_avx512(window + i, src_stride, m_model.xdim, m_model.ydim, input, inv_filter_size, mstd);
-			float scale = mstd[2];
+			if (num_gathered == 4) {
+				apply_model(input, activation, mstd);
 
-			for (unsigned q = 0; q < (m_use_q2 ? 2U : 1U); ++q) {
-				const float *neurons = q ? m_model.neurons_q2 : m_model.neurons_q1;
-				const float *bias = q ? m_model.bias_q2 : m_model.bias_q1;
+				dst_p[gathered_idx[0]] = mstd[0 * 4 + 3];
+				dst_p[gathered_idx[1]] = mstd[1 * 4 + 3];
+				dst_p[gathered_idx[2]] = mstd[2 * 4 + 3];
+				dst_p[gathered_idx[3]] = mstd[3 * 4 + 3];
 
-				interleaved_convolution_avx512<NNS>(neurons, input, nns, filter_size, activation, scale, bias);
-
-				softmax_exp<NNS>(activation, nns);
-				wae5<NNS>(activation, activation + nns, nns, mstd);
+				num_gathered = 0;
 			}
+		}
+		if (num_gathered) {
+			apply_model(input, activation, mstd);
 
-			dst_p[i] = mstd[3] * (m_use_q2 ? 0.5f : 1.0f);
+			for (unsigned idx = 0; idx < num_gathered; ++idx) {
+				dst_p[gathered_idx[idx]] = mstd[idx * 4 + 3];
+			}
 		}
 	}
 };
@@ -1216,14 +1116,7 @@ std::unique_ptr<Prescreener> create_prescreener_new_avx512f(const PrescreenerNew
 
 std::unique_ptr<Predictor> create_predictor_avx512f(const std::pair<const PredictorTraits, PredictorCoefficients> &model, bool use_q2)
 {
-	switch (model.first.nns) {
-	case 16:
-		return std::make_unique<PredictorAVX512F<16>>(model, use_q2);
-	case 32:
-		return std::make_unique<PredictorAVX512F<32>>(model, use_q2);
-	default:
-		return std::make_unique<PredictorAVX512F<0>>(model, use_q2);
-	}
+	return std::make_unique<PredictorAVX512F>(model, use_q2);
 }
 
 } // namespace znedi3
