@@ -39,7 +39,7 @@ void float_to_integer(const void *src, void *dst, size_t n)
 	});
 }
 
-float convolution(const float *kernel, const float *input, unsigned n, float scale, float bias)
+float dot_product(const float *kernel, const float *input, unsigned n, float scale, float bias)
 {
 	float accum = 0.0f;
 
@@ -111,19 +111,19 @@ public:
 
 			// Layer 0.
 			for (unsigned n = 0; n < 4; ++n) {
-				state[n] = convolution(m_data.kernel_l0[n], input, 48, 1.0f, m_data.bias_l0[n]);
+				state[n] = dot_product(m_data.kernel_l0[n], input, 48, 1.0f, m_data.bias_l0[n]);
 			}
 			std::transform(state + 1, state + 4, state + 1, elliott);
 
 			// Layer 1.
 			for (unsigned n = 0; n < 4; ++n) {
-				state[n + 4] = convolution(m_data.kernel_l1[n], state, 4, 1.0f, m_data.bias_l1[n]);
+				state[n + 4] = dot_product(m_data.kernel_l1[n], state, 4, 1.0f, m_data.bias_l1[n]);
 			}
 			std::transform(state + 4, state + 8, state + 4, elliott);
 
 			// Layer 2.
 			for (unsigned n = 0; n < 4; ++n) {
-				state[n + 8] = convolution(m_data.kernel_l2[n], state, 8, 1.0f, m_data.bias_l2[n]);
+				state[n + 8] = dot_product(m_data.kernel_l2[n], state, 8, 1.0f, m_data.bias_l2[n]);
 			}
 
 			prescreen[j] = std::max(state[10], state[11]) <= std::max(state[8], state[9]) ? UCHAR_MAX : 0;
@@ -169,12 +169,12 @@ public:
 			}
 
 			for (unsigned n = 0; n < 4; ++n) {
-				state[n] = convolution(m_data.kernel_l0[n], input, 64, 1.0f, m_data.bias_l0[n]);
+				state[n] = dot_product(m_data.kernel_l0[n], input, 64, 1.0f, m_data.bias_l0[n]);
 			}
 			std::transform(state, state + 4, state, elliott);
 
 			for (unsigned n = 0; n < 4; ++n) {
-				state[n + 4] = convolution(m_data.kernel_l1[n], state, 4, 1.0f, m_data.bias_l1[n]);
+				state[n + 4] = dot_product(m_data.kernel_l1[n], state, 4, 1.0f, m_data.bias_l1[n]);
 			}
 
 			for (unsigned n = 0; n < 4; ++n) {
@@ -275,10 +275,10 @@ public:
 			float scale = mstd[2];
 
 			for (unsigned nn = 0; nn < nns; ++nn) {
-				activation[nn] = convolution(softmax_q1_filter(nn), input, filter_size, scale, m_model.second.softmax_bias_q1[nn]);
+				activation[nn] = dot_product(softmax_q1_filter(nn), input, filter_size, scale, m_model.second.softmax_bias_q1[nn]);
 			}
 			for (unsigned nn = 0; nn < nns; ++nn) {
-				activation[m_model.first.nns + nn] = convolution(elliott_q1_filter(nn), input, filter_size, scale, m_model.second.elliott_bias_q1[nn]);
+				activation[m_model.first.nns + nn] = dot_product(elliott_q1_filter(nn), input, filter_size, scale, m_model.second.elliott_bias_q1[nn]);
 			}
 
 			std::transform(activation, activation + nns, activation, softmax_exp);
@@ -286,10 +286,10 @@ public:
 
 			if (m_use_q2) {
 				for (unsigned nn = 0; nn < nns; ++nn) {
-					activation[nn] = convolution(softmax_q2_filter(nn), input, filter_size, scale, m_model.second.softmax_bias_q2[nn]);
+					activation[nn] = dot_product(softmax_q2_filter(nn), input, filter_size, scale, m_model.second.softmax_bias_q2[nn]);
 				}
 				for (unsigned nn = 0; nn < nns; ++nn) {
-					activation[nns + nn] = convolution(elliott_q2_filter(nn), input, filter_size, scale, m_model.second.elliott_bias_q2[nn]);
+					activation[nns + nn] = dot_product(elliott_q2_filter(nn), input, filter_size, scale, m_model.second.elliott_bias_q2[nn]);
 				}
 
 				std::transform(activation, activation + nns, activation, softmax_exp);

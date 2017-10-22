@@ -764,16 +764,15 @@ inline FORCE_INLINE void input_stddev_x4(const __m512d *partial_sum_sumsq, float
 }
 
 template <unsigned Step>
-inline FORCE_INLINE void interleaved_convolution4_avx512(const float *neurons, const float *input, unsigned nns, unsigned filter_size,
-                                                         float *activation, const float *mstd, const float *bias)
+inline FORCE_INLINE void sgemv_x4_avx512(const float *matrix, const float *vector, const float *bias, unsigned matrix_rows, unsigned matrix_cols,
+                                         float *result, unsigned nns, const float *mstd)
 {
 	static_assert(Step == 32 || Step == 64, "bad step");
 
-	ptrdiff_t nstride = static_cast<ptrdiff_t>(nns) * 2;
-	float *activation_softmax = activation;
-	float *activation_elliott = activation + 4 * nns;
+	float *activation_softmax = result;
+	float *activation_elliott = result + 4 * static_cast<ptrdiff_t>(nns);
 
-	for (ptrdiff_t nn = 0; nn < static_cast<ptrdiff_t>(nns * 2); nn += Step) {
+	for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(matrix_rows); i += Step) {
 		__m512 accum0a = _mm512_setzero_ps();
 		__m512 accum1a = _mm512_setzero_ps();
 		__m512 accum2a = _mm512_setzero_ps();
@@ -794,21 +793,21 @@ inline FORCE_INLINE void interleaved_convolution4_avx512(const float *neurons, c
 		__m512 accum2d = _mm512_setzero_ps();
 		__m512 accum3d = _mm512_setzero_ps();
 
-		for (ptrdiff_t i = 0; i < filter_size; ++i) {
-			__m512 x0 = _mm512_set1_ps(input[0 * filter_size + i]);
-			__m512 x1 = _mm512_set1_ps(input[1 * filter_size + i]);
-			__m512 x2 = _mm512_set1_ps(input[2 * filter_size + i]);
-			__m512 x3 = _mm512_set1_ps(input[3 * filter_size + i]);
+		for (ptrdiff_t j = 0; j < matrix_cols; ++j) {
+			__m512 x0 = _mm512_set1_ps(vector[0 * matrix_cols + j]);
+			__m512 x1 = _mm512_set1_ps(vector[1 * matrix_cols + j]);
+			__m512 x2 = _mm512_set1_ps(vector[2 * matrix_cols + j]);
+			__m512 x3 = _mm512_set1_ps(vector[3 * matrix_cols + j]);
 			__m512 coeffs;
 
-			coeffs = _mm512_load_ps(neurons + i * nstride + nn + 0);
+			coeffs = _mm512_load_ps(matrix + j * matrix_rows + i + 0);
 
 			accum0a = _mm512_fmadd_ps(coeffs, x0, accum0a);
 			accum1a = _mm512_fmadd_ps(coeffs, x1, accum1a);
 			accum2a = _mm512_fmadd_ps(coeffs, x2, accum2a);
 			accum3a = _mm512_fmadd_ps(coeffs, x3, accum3a);
 
-			coeffs = _mm512_load_ps(neurons + i * nstride + nn + 16);
+			coeffs = _mm512_load_ps(matrix + j * matrix_rows + i + 16);
 
 			accum0b = _mm512_fmadd_ps(coeffs, x0, accum0b);
 			accum1b = _mm512_fmadd_ps(coeffs, x1, accum1b);
@@ -816,14 +815,14 @@ inline FORCE_INLINE void interleaved_convolution4_avx512(const float *neurons, c
 			accum3b = _mm512_fmadd_ps(coeffs, x3, accum3b);
 
 			if (Step >= 64) {
-				coeffs = _mm512_load_ps(neurons + i * nstride + nn + 32);
+				coeffs = _mm512_load_ps(matrix + j * matrix_rows + i + 32);
 
 				accum0c = _mm512_fmadd_ps(coeffs, x0, accum0c);
 				accum1c = _mm512_fmadd_ps(coeffs, x1, accum1c);
 				accum2c = _mm512_fmadd_ps(coeffs, x2, accum2c);
 				accum3c = _mm512_fmadd_ps(coeffs, x3, accum3c);
 
-				coeffs = _mm512_load_ps(neurons + i * nstride + nn + 48);
+				coeffs = _mm512_load_ps(matrix + j * matrix_rows + i + 48);
 
 				accum0d = _mm512_fmadd_ps(coeffs, x0, accum0d);
 				accum1d = _mm512_fmadd_ps(coeffs, x1, accum1d);
@@ -839,50 +838,50 @@ inline FORCE_INLINE void interleaved_convolution4_avx512(const float *neurons, c
 		__m512 bias_ps;
 		float *dst;
 
-		bias_ps = _mm512_load_ps(bias + nn + 0);
+		bias_ps = _mm512_load_ps(bias + i + 0);
 		accum0a = _mm512_fmadd_ps(scale0, accum0a, bias_ps);
 		accum1a = _mm512_fmadd_ps(scale1, accum1a, bias_ps);
 		accum2a = _mm512_fmadd_ps(scale2, accum2a, bias_ps);
 		accum3a = _mm512_fmadd_ps(scale3, accum3a, bias_ps);
 
-		dst = nn + 0 >= static_cast<ptrdiff_t>(nns) ? activation_elliott + (nn + 0) - static_cast<ptrdiff_t>(nns) : activation_softmax + nn + 0;
+		dst = i + 0 >= static_cast<ptrdiff_t>(nns) ? activation_elliott + (i + 0) - static_cast<ptrdiff_t>(nns) : activation_softmax + i + 0;
 		_mm512_store_ps(dst + 0 * static_cast<ptrdiff_t>(nns), accum0a);
 		_mm512_store_ps(dst + 1 * static_cast<ptrdiff_t>(nns), accum1a);
 		_mm512_store_ps(dst + 2 * static_cast<ptrdiff_t>(nns), accum2a);
 		_mm512_store_ps(dst + 3 * static_cast<ptrdiff_t>(nns), accum3a);
 
-		bias_ps = _mm512_load_ps(bias + nn + 16);
+		bias_ps = _mm512_load_ps(bias + i + 16);
 		accum0b = _mm512_fmadd_ps(scale0, accum0b, bias_ps);
 		accum1b = _mm512_fmadd_ps(scale1, accum1b, bias_ps);
 		accum2b = _mm512_fmadd_ps(scale2, accum2b, bias_ps);
 		accum3b = _mm512_fmadd_ps(scale3, accum3b, bias_ps);
 
-		dst = nn + 16 >= static_cast<ptrdiff_t>(nns) ? activation_elliott + (nn + 16) - static_cast<ptrdiff_t>(nns) : activation_softmax + nn + 16;
+		dst = i + 16 >= static_cast<ptrdiff_t>(nns) ? activation_elliott + (i + 16) - static_cast<ptrdiff_t>(nns) : activation_softmax + i + 16;
 		_mm512_store_ps(dst + 0 * static_cast<ptrdiff_t>(nns), accum0b);
 		_mm512_store_ps(dst + 1 * static_cast<ptrdiff_t>(nns), accum1b);
 		_mm512_store_ps(dst + 2 * static_cast<ptrdiff_t>(nns), accum2b);
 		_mm512_store_ps(dst + 3 * static_cast<ptrdiff_t>(nns), accum3b);
 
 		if (Step >= 64) {
-			bias_ps = _mm512_load_ps(bias + nn + 32);
+			bias_ps = _mm512_load_ps(bias + i + 32);
 			accum0c = _mm512_fmadd_ps(scale0, accum0c, bias_ps);
 			accum1c = _mm512_fmadd_ps(scale1, accum1c, bias_ps);
 			accum2c = _mm512_fmadd_ps(scale2, accum2c, bias_ps);
 			accum3c = _mm512_fmadd_ps(scale3, accum3c, bias_ps);
 
-			dst = nn + 32 >= static_cast<ptrdiff_t>(nns) ? activation_elliott + (nn + 32) - static_cast<ptrdiff_t>(nns) : activation_softmax + nn + 32;
+			dst = i + 32 >= static_cast<ptrdiff_t>(nns) ? activation_elliott + (i + 32) - static_cast<ptrdiff_t>(nns) : activation_softmax + i + 32;
 			_mm512_store_ps(dst + 0 * static_cast<ptrdiff_t>(nns), accum0c);
 			_mm512_store_ps(dst + 1 * static_cast<ptrdiff_t>(nns), accum1c);
 			_mm512_store_ps(dst + 2 * static_cast<ptrdiff_t>(nns), accum2c);
 			_mm512_store_ps(dst + 3 * static_cast<ptrdiff_t>(nns), accum3c);
 
-			bias_ps = _mm512_load_ps(bias + nn + 48);
+			bias_ps = _mm512_load_ps(bias + i + 48);
 			accum0d = _mm512_fmadd_ps(scale0, accum0d, bias_ps);
 			accum1d = _mm512_fmadd_ps(scale1, accum1d, bias_ps);
 			accum2d = _mm512_fmadd_ps(scale2, accum2d, bias_ps);
 			accum3d = _mm512_fmadd_ps(scale3, accum3d, bias_ps);
 
-			dst = nn + 48 >= static_cast<ptrdiff_t>(nns) ? activation_elliott + (nn + 48) - static_cast<ptrdiff_t>(nns) : activation_softmax + nn + 48;
+			dst = i + 48 >= static_cast<ptrdiff_t>(nns) ? activation_elliott + (i + 48) - static_cast<ptrdiff_t>(nns) : activation_softmax + i + 48;
 			_mm512_store_ps(dst + 0 * static_cast<ptrdiff_t>(nns), accum0d);
 			_mm512_store_ps(dst + 1 * static_cast<ptrdiff_t>(nns), accum1d);
 			_mm512_store_ps(dst + 2 * static_cast<ptrdiff_t>(nns), accum2d);
@@ -1002,7 +1001,7 @@ class PredictorAVX512F final : public Predictor {
 			const float *bias = q ? m_model.bias_q2 : m_model.bias_q1;
 
 			input_stddev_x4(partial_sum_sumsq, mstd, m_inv_filter_size);
-			interleaved_convolution4_avx512<N>(neurons, input, nns, filter_size, activation, mstd, bias);
+			sgemv_x4_avx512<N>(neurons, input, bias, nns * 2, filter_size, activation, nns, mstd);
 			softmax_exp(activation_softmax, 4 * nns);
 			wae5_x4(activation_softmax, activation_elliott, nns, mstd);
 		}
