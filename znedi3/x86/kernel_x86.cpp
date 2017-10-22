@@ -33,7 +33,7 @@ pixel_io_func select_pixel_io_func_avx512f(PixelType in, PixelType out)
 
 } // namespace
 
-InterleavedPredictorModel create_interleaved_predictor_model(const std::pair<const PredictorTraits, PredictorCoefficients> &model)
+InterleavedPredictorModel create_interleaved_predictor_model(const PredictorModel &model)
 {
 	assert(model.first.nns % 16 == 0);
 
@@ -155,7 +155,7 @@ std::unique_ptr<Prescreener> create_prescreener_new_x86(const PrescreenerNewCoef
 	return ret;
 }
 
-std::unique_ptr<Predictor> create_predictor_x86(const std::pair<const PredictorTraits, PredictorCoefficients> &model, bool use_q2, CPUClass cpu)
+std::unique_ptr<Predictor> create_predictor_x86(const PredictorModel &model, bool use_q2, CPUClass cpu)
 {
 	X86Capabilities caps = query_x86_capabilities();
 	std::unique_ptr<Predictor> ret;

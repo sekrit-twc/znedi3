@@ -1240,7 +1240,7 @@ std::unique_ptr<Prescreener> create_prescreener_new_avx512f(const PrescreenerNew
 	return std::make_unique<PrescreenerNewAVX512F>(coeffs, pixel_half);
 }
 
-std::unique_ptr<Predictor> create_predictor_avx512f(const std::pair<const PredictorTraits, PredictorCoefficients> &model, bool use_q2)
+std::unique_ptr<Predictor> create_predictor_avx512f(const PredictorModel &model, bool use_q2)
 {
 	if (model.first.nns >= 32)
 		return std::make_unique<PredictorAVX512F<64>>(model, use_q2);
