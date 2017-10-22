@@ -37,8 +37,8 @@ CPUClass translate_cpu_type(znedi3_cpu_type_e e)
 	case ZNEDI3_CPU_X86_F16C:
 		return CPUClass::X86_F16C;
 	case ZNEDI3_CPU_X86_AVX2:
-	case ZNEDI3_CPU_X86_AVX512F:
 		return CPUClass::X86_AVX2;
+	case ZNEDI3_CPU_X86_AVX512F:
 	case ZNEDI3_CPU_X86_AVX512_SKL:
 		return CPUClass::X86_AVX512;
 #endif
