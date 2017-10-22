@@ -40,9 +40,9 @@ struct InterleavedPredictorModel {
 	unsigned ydim;
 	unsigned nns;
 
-	// Filter coefficients are stored interleaved, such that all the softmax
-	// coeffcients for kernel position n are stored continguously, followed by
-	// all the elliott coefficients for kernel position n.
+	// Filter coefficients are stored interleaved, such that all the
+	// coefficients for the n-th softmax neuron are stored contiguously,
+	// followed by all the coefficients for the n-th elliott neuron.
 	//
 	// f[nn=0][k=0] f[nn=1][k=0] f[nn=2][k=0] ... f[nn=nns*2][k=0]
 	// f[nn=0][k=1] f[nn=1][k=1] f[nn=2][k=1] ... f[nn=nns*2][k=1]
