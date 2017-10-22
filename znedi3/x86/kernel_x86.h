@@ -60,6 +60,7 @@ InterleavedPredictorModel create_interleaved_predictor_model(const PredictorMode
 
 // SSE
 std::unique_ptr<Prescreener> create_prescreener_old_sse(const PrescreenerOldCoefficients &coeffs, double pixel_half);
+std::unique_ptr<Prescreener> create_prescreener_new_sse(const PrescreenerNewCoefficients &coeffs, double pixel_half);
 std::unique_ptr<Predictor> create_predictor_sse(const PredictorModel &model, bool use_q2);
 
 // SSE2

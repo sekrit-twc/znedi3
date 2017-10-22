@@ -196,6 +196,112 @@ public:
 };
 
 
+class PrescreenerNewSSE : public Prescreener {
+	struct InterleavedPrescreenerNewCoefficients {
+		float kernel_l0[64][4];
+		float bias_l0[4];
+
+		float kernel_l1[4][4];
+		float bias_l1[4];
+	};
+
+	AlignedVector<InterleavedPrescreenerNewCoefficients> m_data;
+public:
+	PrescreenerNewSSE(const PrescreenerNewCoefficients &data, double half) :
+		m_data(1)
+	{
+		PrescreenerNewCoefficients d = data;
+		subtract_mean(d, half);
+
+		for (unsigned i = 0; i < 64; ++i) {
+			for (unsigned n = 0; n < 4; ++n) {
+				m_data[0].kernel_l0[i][n] = d.kernel_l0[n][i];
+			}
+		}
+		for (unsigned i = 0; i < 4; ++i) {
+			for (unsigned n = 0; n < 4; ++n) {
+				m_data[0].kernel_l1[i][n] = d.kernel_l1[n][i];
+			}
+		}
+
+		std::copy_n(d.bias_l0, 4, m_data[0].bias_l0);
+		std::copy_n(d.bias_l1, 4, m_data[0].bias_l1);
+	}
+
+	size_t get_tmp_size() const override { return 0; }
+
+	void process(const void *src, ptrdiff_t src_stride, unsigned char *prescreen, void *tmp, unsigned n) const override
+	{
+		const InterleavedPrescreenerNewCoefficients &data = m_data.front();
+
+		const float *src_p = static_cast<const float *>(src);
+		ptrdiff_t src_stride_f = src_stride / sizeof(float);
+
+		// Adjust source pointer to point to top-left of filter window.
+		const float *window = src_p - 2 * src_stride_f - 6;
+
+		for (ptrdiff_t j = 0; j < n; j += 4) {
+			__m128 accum0 = _mm_setzero_ps();
+			__m128 accum1 = _mm_setzero_ps();
+			__m128 accum2 = _mm_setzero_ps();
+			__m128 accum3 = _mm_setzero_ps();
+
+			// Layer 0.
+			for (ptrdiff_t ki = 0; ki < 4; ++ki) {
+				for (ptrdiff_t kj = 0; kj < 16; kj += 4) {
+					__m128 xtmp = _mm_loadu_ps(window + ki * src_stride_f + j + kj);
+					__m128 x, coeffs;
+
+					coeffs = _mm_load_ps(data.kernel_l0[ki * 16 + kj + 0]);
+					x = _mm_shuffle_ps(xtmp, xtmp, _MM_SHUFFLE(0, 0, 0, 0));
+					accum0 = _mm_add_ps(accum0, _mm_mul_ps(coeffs, x));
+
+					coeffs = _mm_load_ps(data.kernel_l0[ki * 16 + kj + 1]);
+					x = _mm_shuffle_ps(xtmp, xtmp, _MM_SHUFFLE(1, 1, 1, 1));
+					accum1 = _mm_add_ps(accum1, _mm_mul_ps(coeffs, x));
+
+					coeffs = _mm_load_ps(data.kernel_l0[ki * 16 + kj + 2]);
+					x = _mm_shuffle_ps(xtmp, xtmp, _MM_SHUFFLE(2, 2, 2, 2));
+					accum2 = _mm_add_ps(accum2, _mm_mul_ps(coeffs, x));
+
+					coeffs = _mm_load_ps(data.kernel_l0[ki * 16 + kj + 3]);
+					x = _mm_shuffle_ps(xtmp, xtmp, _MM_SHUFFLE(3, 3, 3, 3));
+					accum3 = _mm_add_ps(accum3, _mm_mul_ps(coeffs, x));
+				}
+			}
+
+			accum0 = _mm_add_ps(accum0, accum1);
+			accum2 = _mm_add_ps(accum2, accum3);
+			accum0 = _mm_add_ps(accum0, accum2);
+
+			__m128 l0 = _mm_add_ps(accum0, _mm_load_ps(data.bias_l0));
+			l0 = mm_elliott_ps(l0);
+
+			// Layer1
+			accum0 = _mm_mul_ps(_mm_load_ps(data.kernel_l1[0]), _mm_shuffle_ps(l0, l0, _MM_SHUFFLE(0, 0, 0, 0)));
+			accum1 = _mm_mul_ps(_mm_load_ps(data.kernel_l1[1]), _mm_shuffle_ps(l0, l0, _MM_SHUFFLE(1, 1, 1, 1)));
+			accum2 = _mm_mul_ps(_mm_load_ps(data.kernel_l1[2]), _mm_shuffle_ps(l0, l0, _MM_SHUFFLE(2, 2, 2, 2)));
+			accum3 = _mm_mul_ps(_mm_load_ps(data.kernel_l1[3]), _mm_shuffle_ps(l0, l0, _MM_SHUFFLE(3, 3, 3, 3)));
+
+			accum0 = _mm_add_ps(accum0, accum1);
+			accum2 = _mm_add_ps(accum2, accum3);
+			accum0 = _mm_add_ps(accum0, accum2);
+
+			__m128 l1 = _mm_add_ps(accum0, _mm_load_ps(data.bias_l1));
+			l1 = mm_elliott_ps(l1);
+
+			alignas(16) uint32_t prescreen_mask_tmp[4];
+			_mm_store_ps((float *)prescreen_mask_tmp, _mm_cmple_ps(_mm_setzero_ps(), l1));
+
+			prescreen[j + 0] = static_cast<uint8_t>(prescreen_mask_tmp[0]);
+			prescreen[j + 1] = static_cast<uint8_t>(prescreen_mask_tmp[1]);
+			prescreen[j + 2] = static_cast<uint8_t>(prescreen_mask_tmp[2]);
+			prescreen[j + 3] = static_cast<uint8_t>(prescreen_mask_tmp[3]);
+		}
+	}
+};
+
+
 inline FORCE_INLINE void gather_input_sse(const float *src, ptrdiff_t src_stride, ptrdiff_t xdim, ptrdiff_t ydim, float *buf, float mstd[4], double inv_size)
 {
 	ptrdiff_t src_stride_f = src_stride / sizeof(float);
@@ -307,6 +413,11 @@ public:
 std::unique_ptr<Prescreener> create_prescreener_old_sse(const PrescreenerOldCoefficients &coeffs, double pixel_half)
 {
 	return std::make_unique<PrescreenerOldSSE>(coeffs, pixel_half);
+}
+
+std::unique_ptr<Prescreener> create_prescreener_new_sse(const PrescreenerNewCoefficients &coeffs, double pixel_half)
+{
+	return std::make_unique<PrescreenerNewSSE>(coeffs, pixel_half);
 }
 
 std::unique_ptr<Predictor> create_predictor_sse(const PredictorModel &model, bool use_q2)

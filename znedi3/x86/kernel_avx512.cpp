@@ -519,7 +519,7 @@ public:
 		const __m512 l0_c32 = _mm512_load_ps(m_data[0].kernel_l0[3] + 32);
 		const __m512 l0_c33 = _mm512_load_ps(m_data[0].kernel_l0[3] + 48);
 
-		for (unsigned j = 0; j < n; j += 16) {
+		for (ptrdiff_t j = 0; j < n; j += 16) {
 			// Layer 1.
 			__m512 x0, x1, x2, x3;
 			__m512 partial0, partial1, partial2, partial3;
