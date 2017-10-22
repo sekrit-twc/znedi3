@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <cfloat>
 #include <cmath>
 #include <cstddef>
 #include <cstdint>
@@ -13,6 +14,45 @@
 namespace znedi3 {
 namespace {
 
+// Applies a 4x4 transpose to each 128-bit lane.
+inline FORCE_INLINE void mm512_transpose4_4x4_ps(__m512 &a, __m512 &b, __m512 &c, __m512 &d)
+{
+	__m512 t0 = _mm512_shuffle_ps(a, b, 0x44);
+	__m512 t1 = _mm512_shuffle_ps(c, d, 0x44);
+	__m512 t2 = _mm512_shuffle_ps(a, b, 0xEE);
+	__m512 t3 = _mm512_shuffle_ps(c, d, 0xEE);
+	a = _mm512_shuffle_ps(t0, t1, 0x88);
+	b = _mm512_shuffle_ps(t0, t1, 0xDD);
+	c = _mm512_shuffle_ps(t2, t3, 0x88);
+	d = _mm512_shuffle_ps(t2, t3, 0xDD);
+}
+
+// Applies a 4x4 transpose to each 256-bit lane.
+inline FORCE_INLINE void mm512_transpose2_4x4_pd(__m512d &a, __m512d &b, __m512d &c, __m512d &d)
+{
+	__m512d t0 = _mm512_unpacklo_pd(a, b);
+	__m512d t1 = _mm512_unpacklo_pd(c, d);
+	__m512d t2 = _mm512_unpackhi_pd(a, b);
+	__m512d t3 = _mm512_unpackhi_pd(c, d);
+	a = _mm512_permutex2var_pd(t0, _mm512_set_epi64(13, 12, 5, 4, 9, 8, 1, 0), t1);
+	b = _mm512_permutex2var_pd(t2, _mm512_set_epi64(13, 12, 5, 4, 9, 8, 1, 0), t3);
+	c = _mm512_permutex2var_pd(t0, _mm512_set_epi64(15, 14, 7, 6, 11, 10, 3, 2), t1);
+	d = _mm512_permutex2var_pd(t2, _mm512_set_epi64(15, 14, 7, 6, 11, 10, 3, 2), t3);
+}
+
+// Transpose a 4x4 matrix of packed 128-bit elements.
+inline FORCE_INLINE void mm512_transpose4_ps128(__m512 &a, __m512 &b, __m512 &c, __m512 &d)
+{
+	__m512 t0 = _mm512_shuffle_f32x4(a, b, 0x44);
+	__m512 t1 = _mm512_shuffle_f32x4(c, d, 0x44);
+	__m512 t2 = _mm512_shuffle_f32x4(a, b, 0xEE);
+	__m512 t3 = _mm512_shuffle_f32x4(c, d, 0xEE);
+	a = _mm512_shuffle_f32x4(t0, t1, 0x88);
+	b = _mm512_shuffle_f32x4(t0, t1, 0xDD);
+	c = _mm512_shuffle_f32x4(t2, t3, 0x88);
+	d = _mm512_shuffle_f32x4(t2, t3, 0xDD);
+}
+
 inline FORCE_INLINE __m128d mm512_horizontal_sum2_pd(__m512d x, __m512d y)
 {
 	__m256d stage1x = _mm256_add_pd(_mm512_castpd512_pd256(x), _mm512_extractf64x4_pd(x, 1));
@@ -22,13 +62,21 @@ inline FORCE_INLINE __m128d mm512_horizontal_sum2_pd(__m512d x, __m512d y)
 	return stage3;
 }
 
-inline FORCE_INLINE __m128 mm_rsqrt24_ss(__m128 x)
+inline FORCE_INLINE __m128 mm_rsqrt24_ps(__m128 x)
 {
-	__m128 tmp0 = _mm_rsqrt_ss(x);
-	__m128 tmp1 = _mm_mul_ss(x, tmp0);
-	__m128 tmp2 = _mm_mul_ss(_mm_set_ss(0.5f), tmp0);
-	__m128 tmp3 = _mm_fnmadd_ss(tmp1, tmp0, _mm_set_ss(3.0f));
-	return _mm_mul_ss(tmp2, tmp3);
+	__m128 tmp0 = _mm_rsqrt_ps(x);
+	__m128 tmp1 = _mm_mul_ps(x, tmp0);
+	__m128 tmp2 = _mm_mul_ps(_mm_set_ps1(0.5f), tmp0);
+	__m128 tmp3 = _mm_fnmadd_ps(tmp1, tmp0, _mm_set_ps1(3.0f));
+	return _mm_mul_ps(tmp2, tmp3);
+}
+
+inline FORCE_INLINE __m512 mm512_rcp24_ps(__m512 x)
+{
+	__m512 tmp0 = _mm512_rcp14_ps(x);
+	__m512 tmp1 = _mm512_fnmadd_ps(x, tmp0, _mm512_set1_ps(1.0f));
+	__m512 tmp2 = _mm512_fmadd_ps(tmp0, tmp1, tmp0);
+	return tmp2;
 }
 
 inline FORCE_INLINE __m512 mm512_expf_ps(__m512 x)
@@ -62,7 +110,7 @@ inline FORCE_INLINE __m512 mm512_elliott_ps(__m512 x)
 	__m512 den = _mm512_and_ps(x, _mm512_castsi512_ps(mask));
 	den = _mm512_add_ps(den, _mm512_set1_ps(1.0f));
 
-	return _mm512_div_ps(x, den);
+	return _mm512_mul_ps(x, mm512_rcp24_ps(den));
 }
 
 
@@ -432,32 +480,6 @@ public:
 };
 
 
-// Applies a 4x4 transpose to each 128-bit lane.
-inline FORCE_INLINE void mm512_transpose4_4x4_ps(__m512 &a, __m512 &b, __m512 &c, __m512 &d)
-{
-	__m512 t0 = _mm512_shuffle_ps(a, b, 0x44);
-	__m512 t1 = _mm512_shuffle_ps(c, d, 0x44);
-	__m512 t2 = _mm512_shuffle_ps(a, b, 0xEE);
-	__m512 t3 = _mm512_shuffle_ps(c, d, 0xEE);
-	a = _mm512_shuffle_ps(t0, t1, 0x88);
-	b = _mm512_shuffle_ps(t0, t1, 0xDD);
-	c = _mm512_shuffle_ps(t2, t3, 0x88);
-	d = _mm512_shuffle_ps(t2, t3, 0xDD);
-}
-
-// Transpose a 4x4 matrix of packed 128-bit elements.
-inline FORCE_INLINE void mm512_transpose4_ps128(__m512 &a, __m512 &b, __m512 &c, __m512 &d)
-{
-	__m512 t0 = _mm512_shuffle_f32x4(a, b, 0x44);
-	__m512 t1 = _mm512_shuffle_f32x4(c, d, 0x44);
-	__m512 t2 = _mm512_shuffle_f32x4(a, b, 0xEE);
-	__m512 t3 = _mm512_shuffle_f32x4(c, d, 0xEE);
-	a = _mm512_shuffle_f32x4(t0, t1, 0x88);
-	b = _mm512_shuffle_f32x4(t0, t1, 0xDD);
-	c = _mm512_shuffle_f32x4(t2, t3, 0x88);
-	d = _mm512_shuffle_f32x4(t2, t3, 0xDD);
-}
-
 class PrescreenerNewAVX512F final : public Prescreener {
 	AlignedVector<PrescreenerNewCoefficients> m_data;
 public:
@@ -656,48 +678,89 @@ public:
 };
 
 
-inline FORCE_INLINE void gather_pixels_avx512(const float *src, ptrdiff_t src_stride, ptrdiff_t xdim, ptrdiff_t ydim, float *buf, double inv_size, float mstd[4])
+inline FORCE_INLINE void gather_pixels_avx512(const float *src, ptrdiff_t src_stride, ptrdiff_t xdim, ptrdiff_t ydim, float *buf, __m512d *partial_sum_sumsq)
 {
 	ptrdiff_t src_stride_f = src_stride / sizeof(float);
 
-	__m512d sum = _mm512_setzero_pd();
-	__m512d sumsq = _mm512_setzero_pd();
+	__m512d sum0 = _mm512_setzero_pd();
+	__m512d sum1 = _mm512_setzero_pd();
+	__m512d sumsq0 = _mm512_setzero_pd();
+	__m512d sumsq1 = _mm512_setzero_pd();
 
-	for (ptrdiff_t i = 0; i < ydim; ++i) {
+	for (ptrdiff_t i = 0; i < ydim; i += 2) {
 		for (ptrdiff_t j = 0; j < xdim; j += 8) {
-			__m256 val = _mm256_loadu_ps(src + j);
+			__m256 val0 = _mm256_loadu_ps(src + 0 * src_stride_f + j);
+			__m256 val1 = _mm256_loadu_ps(src + 1 * src_stride_f + j);
 
-			__m512d vald = _mm512_cvtps_pd(val);
-			sum = _mm512_add_pd(sum, vald);
-			sumsq = _mm512_fmadd_pd(vald, vald, sumsq);
+			__m512d vald0 = _mm512_cvtps_pd(val0);
+			__m512d vald1 = _mm512_cvtps_pd(val1);
 
-			_mm256_store_ps(buf + j, val);
+			sum0 = _mm512_add_pd(sum0, vald0);
+			sum1 = _mm512_add_pd(sum1, vald1);
+
+			sumsq0 = _mm512_fmadd_pd(vald0, vald0, sumsq0);
+			sumsq1 = _mm512_fmadd_pd(vald1, vald1, sumsq1);
+
+			_mm256_store_ps(buf + 0 * xdim + j, val0);
+			_mm256_store_ps(buf + 1 * xdim + j, val1);
 		}
-		src += src_stride_f;
-		buf += xdim;
+		src += 2 * src_stride_f;
+		buf += 2 * xdim;
 	}
 
-	// Get horizontal sums.
-	__m128d hsum = mm512_horizontal_sum2_pd(sum, sumsq);
-	hsum = _mm_mul_pd(hsum, _mm_set1_pd(inv_size));
+	partial_sum_sumsq[0] = _mm512_add_pd(sum0, sum1);
+	partial_sum_sumsq[1] = _mm512_add_pd(sumsq0, sumsq1);
+}
 
-	__m128d sum_reduced = hsum;
-	__m128d sumsq_reduced = _mm_permute_pd(hsum, 1);
+inline FORCE_INLINE void input_stddev_x4(const __m512d *partial_sum_sumsq, float *mstd, double inv_size)
+{
+	__m512d partial_sum0 = partial_sum_sumsq[0];
+	__m512d partial_sum1 = partial_sum_sumsq[2];
+	__m512d partial_sum2 = partial_sum_sumsq[4];
+	__m512d partial_sum3 = partial_sum_sumsq[6];
 
-	__m128d variance = _mm_fnmadd_pd(sum_reduced, sum_reduced, sumsq_reduced);
-	__m128d epsilon_mask = _mm_cmp_sd(variance, _mm_set_sd(FLT_EPSILON), _CMP_GE_OQ);
+	__m512d partial_sumsq0 = partial_sum_sumsq[1];
+	__m512d partial_sumsq1 = partial_sum_sumsq[3];
+	__m512d partial_sumsq2 = partial_sum_sumsq[5];
+	__m512d partial_sumsq3 = partial_sum_sumsq[7];
 
-	__m128 variance_f32 = _mm_cvtsd_ss(_mm_undefined_ps(), variance);
-	__m128 stddev_inv = mm_rsqrt24_ss(variance_f32);
-	__m128 stddev = _mm_mul_ss(stddev_inv, variance_f32);
+	mm512_transpose2_4x4_pd(partial_sum0, partial_sum1, partial_sum2, partial_sum3);
+	mm512_transpose2_4x4_pd(partial_sumsq0, partial_sumsq1, partial_sumsq2, partial_sumsq3);
 
-	stddev_inv = _mm_and_ps(_mm_castpd_ps(epsilon_mask), stddev_inv);
-	stddev = _mm_and_ps(_mm_castpd_ps(epsilon_mask), stddev);
+	partial_sum0 = _mm512_add_pd(partial_sum0, partial_sum1);
+	partial_sum2 = _mm512_add_pd(partial_sum2, partial_sum3);
+	partial_sum0 = _mm512_add_pd(partial_sum0, partial_sum2);
 
-	mstd[0] = static_cast<float>(_mm_cvtsd_f64(sum_reduced));
-	mstd[1] = _mm_cvtss_f32(stddev);
-	mstd[2] = _mm_cvtss_f32(stddev_inv);
-	mstd[3] = 0.0f;
+	partial_sumsq0 = _mm512_add_pd(partial_sumsq0, partial_sumsq1);
+	partial_sumsq2 = _mm512_add_pd(partial_sumsq2, partial_sumsq3);
+	partial_sumsq0 = _mm512_add_pd(partial_sumsq0, partial_sumsq2);
+
+	__m256d sum = _mm256_add_pd(_mm512_castpd512_pd256(partial_sum0), _mm512_extractf64x4_pd(partial_sum0, 1));
+	__m256d sumsq = _mm256_add_pd(_mm512_castpd512_pd256(partial_sumsq0), _mm512_extractf64x4_pd(partial_sumsq0, 1));
+
+	 sum = _mm256_mul_pd(sum, _mm256_set1_pd(inv_size));
+	 sumsq = _mm256_mul_pd(sumsq, _mm256_set1_pd(inv_size));
+
+	__m256d variance = _mm256_fnmadd_pd(sum, sum, sumsq);
+	__mmask8 epsilon_mask = _mm512_cmp_pd_mask(_mm512_castpd256_pd512(variance), _mm512_set1_pd(FLT_EPSILON), _CMP_GE_OQ);
+
+	__m128 variance_f32 = _mm256_cvtpd_ps(variance);
+	__m128 stddev_inv = mm_rsqrt24_ps(variance_f32);
+	__m128 stddev = _mm_mul_ps(stddev_inv, variance_f32);
+
+	stddev_inv = _mm512_castps512_ps128(_mm512_maskz_mov_ps(epsilon_mask, _mm512_castps128_ps512(stddev_inv)));
+	stddev = _mm512_castps512_ps128(_mm512_maskz_mov_ps(epsilon_mask, _mm512_castps128_ps512(stddev)));
+
+	__m128 mstd0 = _mm256_cvtpd_ps(sum);
+	__m128 mstd1 = stddev;
+	__m128 mstd2 = stddev_inv;
+	__m128 mstd3 = _mm_setzero_ps();
+
+	_MM_TRANSPOSE4_PS(mstd0, mstd1, mstd2, mstd3);
+	_mm_store_ps(mstd + 0, mstd0);
+	_mm_store_ps(mstd + 4, mstd1);
+	_mm_store_ps(mstd + 8, mstd2);
+	_mm_store_ps(mstd + 12, mstd3);
 }
 
 inline FORCE_INLINE void interleaved_convolution4_avx512(const float *neurons, const float *input, unsigned nns, unsigned filter_size,
@@ -867,9 +930,10 @@ inline FORCE_INLINE void wae5_x4(const float *softmax, const float *elliott, uns
 
 class PredictorAVX512F final : public Predictor {
 	InterleavedPredictorModel m_model;
+	double m_inv_filter_size;
 	bool m_use_q2;
 
-	void apply_model(float *input, float *activation, float *mstd) const
+	void apply_model(float *input, float *activation, float *mstd, const __m512d *partial_sum_sumsq) const
 	{
 		unsigned filter_size = m_model.xdim * m_model.ydim;
 		unsigned nns = m_model.nns;
@@ -881,6 +945,7 @@ class PredictorAVX512F final : public Predictor {
 			const float *neurons = q ? m_model.neurons_q2 : m_model.neurons_q1;
 			const float *bias = q ? m_model.bias_q2 : m_model.bias_q1;
 
+			input_stddev_x4(partial_sum_sumsq, mstd, m_inv_filter_size);
 			interleaved_convolution4_avx512(neurons, input, nns, filter_size, activation, mstd, bias);
 			softmax_exp(activation_softmax, 4 * nns);
 			wae5_x4(activation_softmax, activation_elliott, nns, mstd);
@@ -889,6 +954,7 @@ class PredictorAVX512F final : public Predictor {
 public:
 	PredictorAVX512F(const PredictorModel &model, bool use_q2) :
 		m_model(create_interleaved_predictor_model(model)),
+		m_inv_filter_size{ 1.0 / (model.first.xdim * model.first.ydim) },
 		m_use_q2{ use_q2 }
 	{
 		assert(model.first.xdim * model.first.ydim <= 48 * 6);
@@ -917,11 +983,11 @@ public:
 		const float *window = src_p - static_cast<ptrdiff_t>(m_model.ydim / 2) * src_stride_f - (m_model.xdim / 2 - 1);
 		unsigned filter_size = m_model.xdim * m_model.ydim;
 
-		double inv_filter_size = 1.0 / filter_size;
-
 		float *input = alloc.allocate_n<float>(48 * 6 * 4);
 		float *activation = alloc.allocate_n<float>(256 * 2 * 4);
 		float *mstd = alloc.allocate_n<float>(4 * 4);
+
+		__m512d partial_sum_sumsq[8];
 		unsigned gathered_idx[4];
 		unsigned num_gathered = 0;
 
@@ -929,12 +995,12 @@ public:
 			if (prescreen[i])
 				continue;
 
-			gather_pixels_avx512(window + i, src_stride, m_model.xdim, m_model.ydim, input + num_gathered * filter_size, inv_filter_size, mstd + num_gathered * 4);
+			gather_pixels_avx512(window + i, src_stride, m_model.xdim, m_model.ydim, input + num_gathered * filter_size, partial_sum_sumsq + num_gathered * 2);
 			gathered_idx[num_gathered] = i;
 			++num_gathered;
 
 			if (num_gathered == 4) {
-				apply_model(input, activation, mstd);
+				apply_model(input, activation, mstd, partial_sum_sumsq);
 
 				dst_p[gathered_idx[0]] = mstd[0 * 4 + 3];
 				dst_p[gathered_idx[1]] = mstd[1 * 4 + 3];
@@ -945,7 +1011,7 @@ public:
 			}
 		}
 		if (num_gathered) {
-			apply_model(input, activation, mstd);
+			apply_model(input, activation, mstd, partial_sum_sumsq);
 
 			for (unsigned idx = 0; idx < num_gathered; ++idx) {
 				dst_p[gathered_idx[idx]] = mstd[idx * 4 + 3];
@@ -1046,13 +1112,15 @@ void float_to_byte_avx512f(const void *src, void *dst, size_t n)
 	uint8_t *dst_p = static_cast<uint8_t *>(dst);
 
 	for (size_t i = 0; i < n - n % 16; i += 16) {
-		__m512i x = _mm512_cvtps_epu32(_mm512_load_ps(src_p + i));
+		__m512i x = _mm512_cvtps_epi32(_mm512_load_ps(src_p + i));
+		x = _mm512_max_epi32(x, _mm512_setzero_si512());
 		_mm_store_si128((__m128i *)(dst_p + i), _mm512_cvtusepi32_epi8(x));
 	}
 	if (n % 16) {
 		// 8-bit mask granularity requires AVX-512 BW.
 		alignas(16) uint8_t tmp[16];
 		__m512i x = _mm512_cvtps_epu32(_mm512_load_ps(src_p + (n - n % 16)));
+		x = _mm512_max_epi32(x, _mm512_setzero_si512());
 		_mm_store_si128((__m128i *)tmp, _mm512_cvtusepi32_epi8(x));
 
 		for (size_t i = n - n % 16; i < n; ++i) {
@@ -1068,12 +1136,14 @@ void float_to_word_avx512f(const void *src, void *dst, size_t n)
 
 	for (size_t i = 0; i < n - n % 16; i += 16) {
 		__m512i x = _mm512_cvtps_epu32(_mm512_load_ps(src_p + i));
+		x = _mm512_max_epi32(x, _mm512_setzero_si512());
 		_mm256_store_si256((__m256i *)(dst_p + i), _mm512_cvtusepi32_epi16(x));
 	}
 	if (n % 16) {
 		// 16-bit mask granularity requires AVX-512 BW.
 		alignas(32) uint16_t tmp[16];
 		__m512i x = _mm512_cvtps_epu32(_mm512_load_ps(src_p + (n - n % 16)));
+		x = _mm512_max_epi32(x, _mm512_setzero_si512());
 		_mm256_store_si256((__m256i *)tmp, _mm512_cvtusepi32_epi16(x));
 
 		for (size_t i = n - n % 16; i < n; ++i) {
