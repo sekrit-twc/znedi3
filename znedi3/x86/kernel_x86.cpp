@@ -125,11 +125,15 @@ std::unique_ptr<Prescreener> create_prescreener_old_x86(const PrescreenerOldCoef
 		if (!ret && cpu == CPUClass::AUTO_64B && caps.avx512f)
 			ret = create_prescreener_old_avx512f(coeffs, pixel_half);
 #endif
+		if (!ret && caps.sse)
+			ret = create_prescreener_old_sse(coeffs, pixel_half);
 	} else {
 #ifdef ZNEDI3_X86_AVX512
 		if (!ret && cpu >= CPUClass::X86_AVX512)
 			ret = create_prescreener_old_avx512f(coeffs, pixel_half);
 #endif
+		if (!ret && cpu >= CPUClass::X86_SSE)
+			ret = create_prescreener_old_sse(coeffs, pixel_half);
 	}
 
 	return ret;

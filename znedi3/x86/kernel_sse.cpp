@@ -1,9 +1,11 @@
 #ifdef ZNEDI3_X86
 
+#include <algorithm>
 #include <cfloat>
 #include <cstdint>
 #include <memory>
 #include <xmmintrin.h>
+#include "alloc.h"
 #include "ccdep.h"
 #include "kernel.h"
 #include "kernel_x86.h"
@@ -58,6 +60,140 @@ inline FORCE_INLINE __m128 mm_elliott_ps(__m128 x)
 
 	return _mm_mul_ps(x, mm_rcp24_ps(den));
 }
+
+
+class PrescreenerOldSSE : public Prescreener {
+	struct InterleavedPrescreenerOldCoefficients {
+		float kernel_l0[48][4];
+		float bias_l0[4];
+
+		float kernel_l1[4][4];
+		float bias_l1[4];
+
+		float kernel_l2[8][4];
+		float bias_l2[4];
+	};
+
+	AlignedVector<InterleavedPrescreenerOldCoefficients> m_data;
+public:
+	PrescreenerOldSSE(const PrescreenerOldCoefficients &data, double half) :
+		m_data(1)
+	{
+		PrescreenerOldCoefficients d = data;
+		subtract_mean(d, half);
+
+		for (unsigned i = 0; i < 48; ++i) {
+			for (unsigned n = 0; n < 4; ++n) {
+				m_data[0].kernel_l0[i][n] = d.kernel_l0[n][i];
+			}
+		}
+		for (unsigned i = 0; i < 4; ++i) {
+			for (unsigned n = 0; n < 4; ++n) {
+				m_data[0].kernel_l1[i][n] = d.kernel_l1[n][i];
+			}
+		}
+		for (unsigned i = 0; i < 8; ++i) {
+			for (unsigned n = 0; n < 4; ++n) {
+				m_data[0].kernel_l2[i][n] = d.kernel_l2[n][i];
+			}
+		}
+
+		std::copy_n(d.bias_l0, 4, m_data[0].bias_l0);
+		std::copy_n(d.bias_l1, 4, m_data[0].bias_l1);
+		std::copy_n(d.bias_l2, 4, m_data[0].bias_l2);
+	}
+
+	size_t get_tmp_size() const override { return 0; }
+
+	void process(const void *src, ptrdiff_t src_stride, unsigned char *prescreen, void *tmp, unsigned n) const override
+	{
+		const InterleavedPrescreenerOldCoefficients &data = m_data.front();
+
+		float *activation = static_cast<float *>(tmp);
+		ptrdiff_t activation_stride = 512 * sizeof(float);
+
+		const float *src_p = static_cast<const float *>(src);
+		ptrdiff_t src_stride_f = src_stride / sizeof(float);
+
+		// Adjust source pointer to point to top-left of filter window.
+		const float *window = src_p - 2 * src_stride_f - 5;
+
+		for (ptrdiff_t j = 0; j < n; ++j) {
+			__m128 accum0 = _mm_setzero_ps();
+			__m128 accum1 = _mm_setzero_ps();
+			__m128 accum2 = _mm_setzero_ps();
+			__m128 accum3 = _mm_setzero_ps();
+
+			// Layer 0.
+			for (ptrdiff_t ki = 0; ki < 4; ++ki) {
+				for (ptrdiff_t kj = 0; kj < 12; kj += 4) {
+					__m128 xtmp = _mm_loadu_ps(window + ki * src_stride_f + j + kj);
+					__m128 x, coeffs;
+
+					coeffs = _mm_load_ps(data.kernel_l0[ki * 12 + kj + 0]);
+					x = _mm_shuffle_ps(xtmp, xtmp, _MM_SHUFFLE(0, 0, 0, 0));
+					accum0 = _mm_add_ps(accum0, _mm_mul_ps(coeffs, x));
+
+					coeffs = _mm_load_ps(data.kernel_l0[ki * 12 + kj + 1]);
+					x = _mm_shuffle_ps(xtmp, xtmp, _MM_SHUFFLE(1, 1, 1, 1));
+					accum1 = _mm_add_ps(accum1, _mm_mul_ps(coeffs, x));
+
+					coeffs = _mm_load_ps(data.kernel_l0[ki * 12 + kj + 2]);
+					x = _mm_shuffle_ps(xtmp, xtmp, _MM_SHUFFLE(2, 2, 2, 2));
+					accum2 = _mm_add_ps(accum2, _mm_mul_ps(coeffs, x));
+
+					coeffs = _mm_load_ps(data.kernel_l0[ki * 12 + kj + 3]);
+					x = _mm_shuffle_ps(xtmp, xtmp, _MM_SHUFFLE(3, 3, 3, 3));
+					accum3 = _mm_add_ps(accum3, _mm_mul_ps(coeffs, x));
+				}
+			}
+
+			accum0 = _mm_add_ps(accum0, accum1);
+			accum2 = _mm_add_ps(accum2, accum3);
+			accum0 = _mm_add_ps(accum0, accum2);
+
+			alignas(16) constexpr uint32_t l0_mask[4] = { 0, UINT32_MAX, UINT32_MAX, UINT32_MAX };
+			__m128 l0 = _mm_add_ps(accum0, _mm_load_ps(data.bias_l0));
+			__m128 l0_elliott = _mm_and_ps(_mm_load_ps((const float *)l0_mask), mm_elliott_ps(l0));
+			l0 = _mm_andnot_ps(_mm_load_ps((const float *)l0_mask), l0);
+			l0 = _mm_or_ps(l0, l0_elliott);
+
+			// Layer 1.
+			accum0 = _mm_mul_ps(_mm_load_ps(data.kernel_l1[0]), _mm_shuffle_ps(l0, l0, _MM_SHUFFLE(0, 0, 0, 0)));
+			accum1 = _mm_mul_ps(_mm_load_ps(data.kernel_l1[1]), _mm_shuffle_ps(l0, l0, _MM_SHUFFLE(1, 1, 1, 1)));
+			accum2 = _mm_mul_ps(_mm_load_ps(data.kernel_l1[2]), _mm_shuffle_ps(l0, l0, _MM_SHUFFLE(2, 2, 2, 2)));
+			accum3 = _mm_mul_ps(_mm_load_ps(data.kernel_l1[3]), _mm_shuffle_ps(l0, l0, _MM_SHUFFLE(3, 3, 3, 3)));
+
+			accum0 = _mm_add_ps(accum0, accum1);
+			accum2 = _mm_add_ps(accum2, accum3);
+			accum0 = _mm_add_ps(accum0, accum2);
+
+			__m128 l1 = _mm_add_ps(accum0, _mm_load_ps(data.bias_l1));
+			l1 = mm_elliott_ps(l1);
+
+			// Layer 2.
+			accum0 = _mm_mul_ps(_mm_load_ps(data.kernel_l2[0]), _mm_shuffle_ps(l0, l0, _MM_SHUFFLE(0, 0, 0, 0)));
+			accum1 = _mm_mul_ps(_mm_load_ps(data.kernel_l2[1]), _mm_shuffle_ps(l0, l0, _MM_SHUFFLE(1, 1, 1, 1)));
+			accum2 = _mm_mul_ps(_mm_load_ps(data.kernel_l2[2]), _mm_shuffle_ps(l0, l0, _MM_SHUFFLE(2, 2, 2, 2)));
+			accum3 = _mm_mul_ps(_mm_load_ps(data.kernel_l2[3]), _mm_shuffle_ps(l0, l0, _MM_SHUFFLE(3, 3, 3, 3)));
+
+			accum0 = _mm_add_ps(accum0, _mm_mul_ps(_mm_load_ps(data.kernel_l2[4]), _mm_shuffle_ps(l1, l1, _MM_SHUFFLE(0, 0, 0, 0))));
+			accum1 = _mm_add_ps(accum1, _mm_mul_ps(_mm_load_ps(data.kernel_l2[5]), _mm_shuffle_ps(l1, l1, _MM_SHUFFLE(1, 1, 1, 1))));
+			accum2 = _mm_add_ps(accum2, _mm_mul_ps(_mm_load_ps(data.kernel_l2[6]), _mm_shuffle_ps(l1, l1, _MM_SHUFFLE(2, 2, 2, 2))));
+			accum3 = _mm_add_ps(accum3, _mm_mul_ps(_mm_load_ps(data.kernel_l2[7]), _mm_shuffle_ps(l1, l1, _MM_SHUFFLE(3, 3, 3, 3))));
+
+			accum0 = _mm_add_ps(accum0, accum1);
+			accum2 = _mm_add_ps(accum2, accum3);
+			accum0 = _mm_add_ps(accum0, accum2);
+
+			__m128 l2 = _mm_add_ps(accum0, _mm_load_ps(data.bias_l2));
+			__m128 l2_swap = _mm_shuffle_ps(l2, l2, _MM_SHUFFLE(2, 3, 0, 1));
+			l2 = _mm_max_ps(l2, l2_swap); // max(l2[0], l2[1]) ... max(l2[2], l2[3]) ...
+
+			prescreen[j] = _mm_comile_ss(_mm_shuffle_ps(l2, l2, _MM_SHUFFLE(1, 0, 3, 2)), l2) ? UCHAR_MAX : 0;
+		}
+	}
+};
 
 
 inline FORCE_INLINE void gather_input_sse(const float *src, ptrdiff_t src_stride, ptrdiff_t xdim, ptrdiff_t ydim, float *buf, float mstd[4], double inv_size)
@@ -167,6 +303,11 @@ public:
 
 } // namespace
 
+
+std::unique_ptr<Prescreener> create_prescreener_old_sse(const PrescreenerOldCoefficients &coeffs, double pixel_half)
+{
+	return std::make_unique<PrescreenerOldSSE>(coeffs, pixel_half);
+}
 
 std::unique_ptr<Predictor> create_predictor_sse(const PredictorModel &model, bool use_q2)
 {
