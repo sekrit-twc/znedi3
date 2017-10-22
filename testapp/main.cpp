@@ -3,6 +3,7 @@
 #include <memory>
 #include <iostream>
 #include <stdexcept>
+#include <type_traits>
 #include <vector>
 #include "argparse.h"
 #include "timer.h"
@@ -204,7 +205,7 @@ int main(int argc, char **argv)
 				dst = static_cast<std::remove_reference_t<decltype(dst)>>(src);
 		};
 
-		params.pixel_type = ZNEDI_PIXEL_BYTE;
+		params.pixel_type = ZNEDI3_PIXEL_BYTE;
 		propagate_if_set(params.nsize, args.nsize);
 		propagate_if_set(params.nns, args.nns);
 		propagate_if_set(params.qual, args.qual);

@@ -50,13 +50,13 @@ CPUClass translate_cpu_type(znedi3_cpu_type_e e)
 PixelType translate_pixel_type(znedi3_pixel_type_e e)
 {
 	switch (e) {
-	case ZNEDI_PIXEL_BYTE:
+	case ZNEDI3_PIXEL_BYTE:
 		return PixelType::BYTE;
-	case ZNEDI_PIXEL_WORD:
+	case ZNEDI3_PIXEL_WORD:
 		return PixelType::WORD;
-	case ZNEDI_PIXEL_HALF:
+	case ZNEDI3_PIXEL_HALF:
 		return PixelType::HALF;
-	case ZNEDI_PIXEL_FLOAT:
+	case ZNEDI3_PIXEL_FLOAT:
 		return PixelType::FLOAT;
 	default:
 		throw std::domain_error{ "bad pixel_type" };
@@ -236,6 +236,8 @@ void znedi3_filter::process(unsigned width, unsigned height, const void *src, pt
 	// Main loop.
 	float *dst_tmp_p = dst_tmp;
 	unsigned char *prescreen = alloc.allocate_n<unsigned char>(ceil_n(width + 16, ALIGNMENT));
+
+	std::fill_n(prescreen, width, 0);
 
 	for (ptrdiff_t i = 0; i < height_d; ++i) {
 		if (m_prescreener)

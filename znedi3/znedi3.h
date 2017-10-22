@@ -28,10 +28,10 @@ typedef enum znedi3_cpu_type_e {
 } znedi3_cpu_type_e;
 
 typedef enum znedi3_pixel_type_e {
-	ZNEDI_PIXEL_BYTE,
-	ZNEDI_PIXEL_WORD,
-	ZNEDI_PIXEL_HALF,
-	ZNEDI_PIXEL_FLOAT
+	ZNEDI3_PIXEL_BYTE,
+	ZNEDI3_PIXEL_WORD,
+	ZNEDI3_PIXEL_HALF,
+	ZNEDI3_PIXEL_FLOAT
 } znedi3_pixel_type_e;
 
 typedef enum znedi3_nsize_e {
