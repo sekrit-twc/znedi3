@@ -165,11 +165,19 @@ std::unique_ptr<Predictor> create_predictor_x86(const PredictorModel &model, boo
 		if (!ret && cpu == CPUClass::AUTO_64B && caps.avx512f)
 			ret = create_predictor_avx512f(model, use_q2);
 #endif
+		if (!ret && caps.sse2)
+			ret = create_predictor_sse2(model, use_q2);
+		if (!ret && caps.sse)
+			ret = create_predictor_sse(model, use_q2);
 	} else {
 #ifdef ZNEDI3_X86_AVX512
 		if (!ret && cpu >= CPUClass::X86_AVX512)
 			ret = create_predictor_avx512f(model, use_q2);
 #endif
+		if (!ret && cpu >= CPUClass::X86_SSE2)
+			ret = create_predictor_sse2(model, use_q2);
+		if (!ret && cpu >= CPUClass::X86_SSE)
+			ret = create_predictor_sse(model, use_q2);
 	}
 
 	return ret;

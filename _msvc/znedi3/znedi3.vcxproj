@@ -128,6 +128,7 @@
     <ClInclude Include="..\..\znedi3\kernel.h" />
     <ClInclude Include="..\..\znedi3\weights.h" />
     <ClInclude Include="..\..\znedi3\x86\cpuinfo_x86.h" />
+    <ClInclude Include="..\..\znedi3\x86\kernel_sse_commmon.h" />
     <ClInclude Include="..\..\znedi3\x86\kernel_x86.h" />
     <ClInclude Include="..\..\znedi3\znedi3.h" />
     <ClInclude Include="..\..\znedi3\znedi3_impl.h" />
@@ -146,6 +147,14 @@
       <UseProcessorExtensions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">COMMON512</UseProcessorExtensions>
       <UseProcessorExtensions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">COMMON512</UseProcessorExtensions>
       <UseProcessorExtensions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">COMMON512</UseProcessorExtensions>
+    </ClCompile>
+    <ClCompile Include="..\..\znedi3\x86\kernel_sse.cpp">
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">StreamingSIMDExtensions</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">StreamingSIMDExtensions</EnableEnhancedInstructionSet>
+    </ClCompile>
+    <ClCompile Include="..\..\znedi3\x86\kernel_sse2.cpp">
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
     </ClCompile>
     <ClCompile Include="..\..\znedi3\x86\kernel_x86.cpp" />
     <ClCompile Include="..\..\znedi3\znedi3.cpp" />

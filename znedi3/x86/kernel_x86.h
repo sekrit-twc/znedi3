@@ -8,13 +8,13 @@
 #include <memory>
 #include <utility>
 #include "alloc.h"
+#include "kernel.h"
 #include "weights.h"
 
 namespace znedi3 {
 
 enum class CPUClass;
-
-class Predictor;
+enum class PixelType;
 
 // Polynomial coefficients for exp2f(x - 1) on the domain [1.0, 2.0].
 // Coefficients are stored low-order to high-order.
@@ -58,6 +58,13 @@ struct InterleavedPredictorModel {
 InterleavedPredictorModel create_interleaved_predictor_model(const PredictorModel &model);
 
 
+// SSE
+std::unique_ptr<Predictor> create_predictor_sse(const PredictorModel &model, bool use_q2);
+
+// SSE2
+std::unique_ptr<Predictor> create_predictor_sse2(const PredictorModel &model, bool use_q2);
+
+// AVX-512F
 void byte_to_float_avx512f(const void *src, void *dst, size_t n);
 void word_to_float_avx512f(const void *src, void *dst, size_t n);
 void half_to_float_avx512f(const void *src, void *dst, size_t n);

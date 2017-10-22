@@ -989,7 +989,7 @@ class PredictorAVX512F final : public Predictor {
 	double m_inv_filter_size;
 	bool m_use_q2;
 
-	void apply_model(float *input, float *activation, float *mstd, const __m512d *partial_sum_sumsq) const
+	void apply_model(const float *input, float *activation, float *mstd, const __m512d *partial_sum_sumsq) const
 	{
 		unsigned filter_size = m_model.xdim * m_model.ydim;
 		unsigned nns = m_model.nns;
