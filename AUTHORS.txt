@@ -1,0 +1,4 @@
+Based on work by:
+	dubhater
+	Loren Merritt
+	tritical
