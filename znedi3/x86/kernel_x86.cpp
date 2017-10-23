@@ -157,6 +157,10 @@ std::unique_ptr<Prescreener> create_prescreener_new_x86(const PrescreenerNewCoef
 		if (!ret && cpu == CPUClass::AUTO_64B && caps.avx512f)
 			ret = create_prescreener_new_avx512f(coeffs, pixel_half);
 #endif
+		if (!ret && caps.avx2 && caps.fma)
+			ret = create_prescreener_new_avx2(coeffs, pixel_half);
+		if (!ret && caps.avx)
+			ret = create_prescreener_new_avx(coeffs, pixel_half);
 		if (!ret && caps.sse)
 			ret = create_prescreener_new_sse(coeffs, pixel_half);
 	} else {
@@ -164,6 +168,10 @@ std::unique_ptr<Prescreener> create_prescreener_new_x86(const PrescreenerNewCoef
 		if (!ret && cpu >= CPUClass::X86_AVX512)
 			ret = create_prescreener_new_avx512f(coeffs, pixel_half);
 #endif
+		if (!ret && cpu >= CPUClass::X86_AVX2)
+			ret = create_prescreener_new_avx2(coeffs, pixel_half);
+		if (!ret && cpu >= CPUClass::X86_AVX)
+			ret = create_prescreener_new_avx(coeffs, pixel_half);
 		if (!ret && caps.sse)
 			ret = create_prescreener_new_sse(coeffs, pixel_half);
 	}

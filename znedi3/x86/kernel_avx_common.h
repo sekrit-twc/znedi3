@@ -69,6 +69,14 @@ inline FORCE_INLINE void mm256_transpose4_pd(__m256d &a, __m256d &b, __m256d &c,
 	d = _mm256_permute2f128_pd(t2, t3, 0x31);
 }
 
+inline FORCE_INLINE void mm256_transpose2_ps128(__m256 &a, __m256 &b)
+{
+	__m256 t0 = _mm256_permute2f128_ps(a, b, 0x20);
+	__m256 t1 = _mm256_permute2f128_ps(a, b, 0x31);
+	a = t0;
+	b = t1;
+}
+
 inline FORCE_INLINE __m128 mm_rsqrt24_ps(__m128 x)
 {
 	__m128 tmp0 = _mm_rsqrt_ps(x);
@@ -350,6 +358,181 @@ public:
 			prescreener_old_layer0_avx(m_data.kernel_l0, m_data.bias_l0, window + i, src_stride, activation, activation_stride, nn);
 			prescreener_old_layer1_avx(m_data.kernel_l1, m_data.bias_l1, activation, activation_stride, nn);
 			prescreener_old_layer2_avx(m_data.kernel_l2, m_data.bias_l2, activation, activation_stride, prescreen + i, nn);
+		}
+	}
+};
+
+
+class PrescreenerNewAVX final : public Prescreener {
+	AlignedVector<PrescreenerNewCoefficients> m_data;
+public:
+	PrescreenerNewAVX(const PrescreenerNewCoefficients &data, double half) :
+		m_data(1, data)
+	{
+		subtract_mean(m_data[0], half);
+	}
+
+	size_t get_tmp_size() const override { return 0; }
+
+	void process(const void *src, ptrdiff_t src_stride, unsigned char *prescreen, void *, unsigned n) const override
+	{
+		const PrescreenerNewCoefficients &data = m_data.front();
+
+		const float *src_p = static_cast<const float *>(src);
+		ptrdiff_t src_stride_f = src_stride / sizeof(float);
+
+		// Adjust source pointer to point to top-left of filter window.
+		const float *window = src_p - 2 * src_stride_f - 6;
+
+		for (ptrdiff_t j = 0; j < n; j += 8) {
+			// Layer 1.
+			__m256 x0a, x1a, x2a, x3a;
+			__m256 x0b, x1b, x2b, x3b;
+			__m256 partial0, partial1;
+			__m256 tmp0, tmp1, tmp2, tmp3;
+
+			// Pixels [0-3].
+			x0a = _mm256_loadu_ps(window + 0 * src_stride_f + j + 0);
+			x1a = _mm256_loadu_ps(window + 1 * src_stride_f + j + 0);
+			x2a = _mm256_loadu_ps(window + 2 * src_stride_f + j + 0);
+			x3a = _mm256_loadu_ps(window + 3 * src_stride_f + j + 0);
+
+			x0b = _mm256_loadu_ps(window + 0 * src_stride_f + j + 8);
+			x1b = _mm256_loadu_ps(window + 1 * src_stride_f + j + 8);
+			x2b = _mm256_loadu_ps(window + 2 * src_stride_f + j + 8);
+			x3b = _mm256_loadu_ps(window + 3 * src_stride_f + j + 8);
+
+			// x0a-x3a.
+			tmp0 = _mm256_mul_ps(_mm256_load_ps(data.kernel_l0[0] + 0), x0a);
+			tmp0 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[0] + 16), x1a, tmp0);
+			tmp0 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[0] + 32), x2a, tmp0);
+			tmp0 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[0] + 48), x3a, tmp0);
+
+			tmp1 = _mm256_mul_ps(_mm256_load_ps(data.kernel_l0[1] + 0), x0a);
+			tmp1 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[1] + 16), x1a, tmp1);
+			tmp1 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[1] + 32), x2a, tmp1);
+			tmp1 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[1] + 48), x3a, tmp1);
+
+			tmp2 = _mm256_mul_ps(_mm256_load_ps(data.kernel_l0[2] + 0), x0a);
+			tmp2 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[2] + 16), x1a, tmp2);
+			tmp2 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[2] + 32), x2a, tmp2);
+			tmp2 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[2] + 48), x3a, tmp2);
+
+			tmp3 = _mm256_mul_ps(_mm256_load_ps(data.kernel_l0[3] + 0), x0a);
+			tmp3 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[3] + 16), x1a, tmp3);
+			tmp3 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[3] + 32), x2a, tmp3);
+			tmp3 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[3] + 48), x3a, tmp3);
+
+			// x0b-x3b.
+			tmp0 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[0] + 8), x0b, tmp0);
+			tmp0 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[0] + 24), x1b, tmp0);
+			tmp0 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[0] + 40), x2b, tmp0);
+			tmp0 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[0] + 56), x3b, tmp0);
+
+			tmp1 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[1] + 8), x0b, tmp1);
+			tmp1 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[1] + 24), x1b, tmp1);
+			tmp1 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[1] + 40), x2b, tmp1);
+			tmp1 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[1] + 56), x3b, tmp1);
+
+			tmp2 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[2] + 8), x0b, tmp2);
+			tmp2 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[2] + 24), x1b, tmp2);
+			tmp2 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[2] + 40), x2b, tmp2);
+			tmp2 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[2] + 56), x3b, tmp2);
+
+			tmp3 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[3] + 8), x0b, tmp3);
+			tmp3 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[3] + 24), x1b, tmp3);
+			tmp3 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[3] + 40), x2b, tmp3);
+			tmp3 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[3] + 56), x3b, tmp3);
+
+			mm256_transpose2_4x4_ps(tmp0, tmp1, tmp2, tmp3);
+			tmp0 = _mm256_add_ps(tmp0, tmp1);
+			tmp2 = _mm256_add_ps(tmp2, tmp3);
+			partial0 = _mm256_add_ps(tmp0, tmp2);
+
+			// Pixels [4-7].
+			x0a = _mm256_loadu_ps(window + 0 * src_stride_f + j + 4);
+			x1a = _mm256_loadu_ps(window + 1 * src_stride_f + j + 4);
+			x2a = _mm256_loadu_ps(window + 2 * src_stride_f + j + 4);
+			x3a = _mm256_loadu_ps(window + 3 * src_stride_f + j + 4);
+
+			x0b = _mm256_loadu_ps(window + 0 * src_stride_f + j + 12);
+			x1b = _mm256_loadu_ps(window + 1 * src_stride_f + j + 12);
+			x2b = _mm256_loadu_ps(window + 2 * src_stride_f + j + 12);
+			x3b = _mm256_loadu_ps(window + 3 * src_stride_f + j + 12);
+
+			// x0a-x3a.
+			tmp0 = _mm256_mul_ps(_mm256_load_ps(data.kernel_l0[0] + 0), x0a);
+			tmp0 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[0] + 16), x1a, tmp0);
+			tmp0 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[0] + 32), x2a, tmp0);
+			tmp0 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[0] + 48), x3a, tmp0);
+
+			tmp1 = _mm256_mul_ps(_mm256_load_ps(data.kernel_l0[1] + 0), x0a);
+			tmp1 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[1] + 16), x1a, tmp1);
+			tmp1 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[1] + 32), x2a, tmp1);
+			tmp1 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[1] + 48), x3a, tmp1);
+
+			tmp2 = _mm256_mul_ps(_mm256_load_ps(data.kernel_l0[2] + 0), x0a);
+			tmp2 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[2] + 16), x1a, tmp2);
+			tmp2 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[2] + 32), x2a, tmp2);
+			tmp2 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[2] + 48), x3a, tmp2);
+
+			tmp3 = _mm256_mul_ps(_mm256_load_ps(data.kernel_l0[3] + 0), x0a);
+			tmp3 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[3] + 16), x1a, tmp3);
+			tmp3 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[3] + 32), x2a, tmp3);
+			tmp3 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[3] + 48), x3a, tmp3);
+
+			// x0b-x3b.
+			tmp0 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[0] + 8), x0b, tmp0);
+			tmp0 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[0] + 24), x1b, tmp0);
+			tmp0 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[0] + 40), x2b, tmp0);
+			tmp0 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[0] + 56), x3b, tmp0);
+
+			tmp1 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[1] + 8), x0b, tmp1);
+			tmp1 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[1] + 24), x1b, tmp1);
+			tmp1 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[1] + 40), x2b, tmp1);
+			tmp1 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[1] + 56), x3b, tmp1);
+
+			tmp2 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[2] + 8), x0b, tmp2);
+			tmp2 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[2] + 24), x1b, tmp2);
+			tmp2 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[2] + 40), x2b, tmp2);
+			tmp2 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[2] + 56), x3b, tmp2);
+
+			tmp3 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[3] + 8), x0b, tmp3);
+			tmp3 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[3] + 24), x1b, tmp3);
+			tmp3 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[3] + 40), x2b, tmp3);
+			tmp3 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[3] + 56), x3b, tmp3);
+
+			mm256_transpose2_4x4_ps(tmp0, tmp1, tmp2, tmp3);
+			tmp0 = _mm256_add_ps(tmp0, tmp1);
+			tmp2 = _mm256_add_ps(tmp2, tmp3);
+			partial1 = _mm256_add_ps(tmp0, tmp2);
+
+			// Finish summing neurons.
+			mm256_transpose2_ps128(partial0, partial1);
+			partial0 = _mm256_add_ps(partial0, partial1);
+
+			__m256 activation_l0 = _mm256_add_ps(partial0, _mm256_broadcast_ps((const __m128 *)data.bias_l0));
+			activation_l0 = mm256_elliott_ps(activation_l0);
+
+			// Layer 2.
+			tmp0 = _mm256_mul_ps(_mm256_broadcast_ps((const __m128 *)data.kernel_l1[0]), activation_l0);
+			tmp1 = _mm256_mul_ps(_mm256_broadcast_ps((const __m128 *)data.kernel_l1[1]), activation_l0);
+			tmp2 = _mm256_mul_ps(_mm256_broadcast_ps((const __m128 *)data.kernel_l1[2]), activation_l0);
+			tmp3 = _mm256_mul_ps(_mm256_broadcast_ps((const __m128 *)data.kernel_l1[3]), activation_l0);
+
+			mm256_transpose2_4x4_ps(tmp0, tmp1, tmp2, tmp3);
+			tmp0 = _mm256_add_ps(tmp0, tmp1);
+			tmp2 = _mm256_add_ps(tmp2, tmp3);
+			tmp0 = _mm256_add_ps(tmp0, tmp2);
+
+			__m256 activation_l1 = _mm256_add_ps(tmp0, _mm256_broadcast_ps((const __m128 *)data.bias_l1));
+			__m256 mask = _mm256_cmp_ps(activation_l1, _mm256_setzero_ps(), _CMP_GT_OQ);
+
+			__m128i mask_lo = _mm_castps_si128(_mm256_castps256_ps128(mask));
+			__m128i mask_hi = _mm_castps_si128(_mm256_extractf128_ps(mask, 1));
+
+			__m128i prescreen_mask = _mm_packs_epi16(_mm_packs_epi32(mask_lo, mask_hi), _mm_setzero_si128());
+			_mm_storel_epi64((__m128i *)(prescreen + j), prescreen_mask);
 		}
 	}
 };

@@ -14,6 +14,11 @@ std::unique_ptr<Prescreener> create_prescreener_old_avx2(const PrescreenerOldCoe
 	return std::make_unique<PrescreenerOldAVX>(coeffs, pixel_half);
 }
 
+std::unique_ptr<Prescreener> create_prescreener_new_avx2(const PrescreenerNewCoefficients &coeffs, double pixel_half)
+{
+	return std::make_unique<PrescreenerNewAVX>(coeffs, pixel_half);
+}
+
 std::unique_ptr<Predictor> create_predictor_avx2(const PredictorModel &model, bool use_q2)
 {
 	return std::make_unique<PredictorAVX>(model, use_q2);
