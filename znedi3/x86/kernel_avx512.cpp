@@ -733,16 +733,15 @@ inline FORCE_INLINE void input_stddev_x4(const __m512d *partial_sum_sumsq, float
 	__m128 mstd2 = stddev_inv;
 	__m128 mstd3 = _mm_setzero_ps();
 
-	_MM_TRANSPOSE4_PS(mstd0, mstd1, mstd2, mstd3);
-	_mm_store_ps(mstd + 0, mstd0);
-	_mm_store_ps(mstd + 4, mstd1);
-	_mm_store_ps(mstd + 8, mstd2);
-	_mm_store_ps(mstd + 12, mstd3);
+	_mm_store_ps(mstd + 0 * 4, mstd0);
+	_mm_store_ps(mstd + 1 * 4, mstd1);
+	_mm_store_ps(mstd + 2 * 4, mstd2);
+	_mm_store_ps(mstd + 3 * 4, mstd3);
 }
 
 template <unsigned Step>
 inline FORCE_INLINE void sgemv_x4_avx512(const float *matrix, const float *vector, const float *bias, unsigned matrix_rows, unsigned matrix_cols,
-                                         float *result, unsigned nns, const float *mstd)
+                                         float *result, unsigned nns, const float *scale)
 {
 	static_assert(Step == 32 || Step == 64, "bad step");
 
@@ -808,10 +807,10 @@ inline FORCE_INLINE void sgemv_x4_avx512(const float *matrix, const float *vecto
 			}
 		}
 
-		__m512 scale0 = _mm512_set1_ps(mstd[0 * 4 + 2]);
-		__m512 scale1 = _mm512_set1_ps(mstd[1 * 4 + 2]);
-		__m512 scale2 = _mm512_set1_ps(mstd[2 * 4 + 2]);
-		__m512 scale3 = _mm512_set1_ps(mstd[3 * 4 + 2]);
+		__m512 scale0 = _mm512_set1_ps(scale[0]);
+		__m512 scale1 = _mm512_set1_ps(scale[1]);
+		__m512 scale2 = _mm512_set1_ps(scale[2]);
+		__m512 scale3 = _mm512_set1_ps(scale[3]);
 		__m512 bias_ps;
 		float *dst;
 
@@ -941,10 +940,9 @@ inline FORCE_INLINE void wae5_x4(const float *softmax, const float *elliott, uns
 	__m128 mask = _mm_cmp_ps(wsum_reduced, _mm_set_ps1(1e-10f), _CMP_GT_OQ);
 
 	// Gather mstd[0] and mstd[1].
-	__m512 mstd_ps = _mm512_permutexvar_ps(_mm512_set_epi32(15, 11, 7, 3, 14, 10, 6, 2, 13, 9, 5, 1, 12, 8, 4, 0), _mm512_load_ps(mstd));
-	__m128 mstd0 = _mm512_castps512_ps128(mstd_ps);
-	__m128 mstd1 = _mm512_extractf32x4_ps(mstd_ps, 1);
-	__m128 mstd3 = _mm512_extractf32x4_ps(mstd_ps, 3);
+	__m128 mstd0 = _mm_load_ps(mstd + 0 * 4);
+	__m128 mstd1 = _mm_load_ps(mstd + 1 * 4);
+	__m128 mstd3 = _mm_load_ps(mstd + 3 * 4);
 
 	vsum_reduced = _mm_mul_ps(vsum_reduced, _mm_set_ps1(5.0f));
 	vsum_reduced = _mm_div_ps(vsum_reduced, wsum_reduced);
@@ -952,10 +950,7 @@ inline FORCE_INLINE void wae5_x4(const float *softmax, const float *elliott, uns
 	vsum_reduced = _mm_blendv_ps(mstd0, vsum_reduced, mask);
 
 	mstd3 = _mm_add_ps(mstd3, vsum_reduced);
-	_mm_store_ss(mstd + 0 * 4 + 3, mstd3);
-	_mm_store_ss(mstd + 1 * 4 + 3, _mm_permute_ps(mstd3, _MM_SHUFFLE(3, 2, 1, 1)));
-	_mm_store_ss(mstd + 2 * 4 + 3, _mm_permute_ps(mstd3, _MM_SHUFFLE(3, 2, 1, 2)));
-	_mm_store_ss(mstd + 3 * 4 + 3, _mm_permute_ps(mstd3, _MM_SHUFFLE(3, 2, 1, 3)));
+	_mm_store_ps(mstd + 3 * 4, mstd3);
 }
 
 
@@ -978,7 +973,7 @@ class PredictorAVX512F final : public Predictor {
 			const float *bias = q ? m_model.bias_q2 : m_model.bias_q1;
 
 			input_stddev_x4(partial_sum_sumsq, mstd, m_inv_filter_size);
-			sgemv_x4_avx512<N>(neurons, input, bias, nns * 2, filter_size, activation, nns, mstd);
+			sgemv_x4_avx512<N>(neurons, input, bias, nns * 2, filter_size, activation, nns, mstd + 2 * 4);
 			softmax_exp(activation_softmax, 4 * nns);
 			wae5_x4(activation_softmax, activation_elliott, nns, mstd);
 		}
@@ -1034,9 +1029,9 @@ public:
 			if (num_gathered == 4) {
 				apply_model(input, activation, mstd, partial_sum_sumsq);
 
-				dst_p[gathered_idx[0]] = mstd[0 * 4 + 3];
-				dst_p[gathered_idx[1]] = mstd[1 * 4 + 3];
-				dst_p[gathered_idx[2]] = mstd[2 * 4 + 3];
+				dst_p[gathered_idx[0]] = mstd[3 * 4 + 0];
+				dst_p[gathered_idx[1]] = mstd[3 * 4 + 1];
+				dst_p[gathered_idx[2]] = mstd[3 * 4 + 2];
 				dst_p[gathered_idx[3]] = mstd[3 * 4 + 3];
 
 				num_gathered = 0;
@@ -1046,7 +1041,7 @@ public:
 			apply_model(input, activation, mstd, partial_sum_sumsq);
 
 			for (unsigned idx = 0; idx < num_gathered; ++idx) {
-				dst_p[gathered_idx[idx]] = mstd[idx * 4 + 3];
+				dst_p[gathered_idx[idx]] = mstd[3 * 4 + idx];
 			}
 		}
 	}
