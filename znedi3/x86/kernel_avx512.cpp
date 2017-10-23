@@ -53,15 +53,6 @@ inline FORCE_INLINE void mm512_transpose4_ps128(__m512 &a, __m512 &b, __m512 &c,
 	d = _mm512_shuffle_f32x4(t2, t3, 0xDD);
 }
 
-inline FORCE_INLINE __m128d mm512_horizontal_sum2_pd(__m512d x, __m512d y)
-{
-	__m256d stage1x = _mm256_add_pd(_mm512_castpd512_pd256(x), _mm512_extractf64x4_pd(x, 1));
-	__m256d stage1y = _mm256_add_pd(_mm512_castpd512_pd256(y), _mm512_extractf64x4_pd(y, 1));
-	__m256d stage2 = _mm256_hadd_pd(stage1x, stage1y);
-	__m128d stage3 = _mm_add_pd(_mm256_castpd256_pd128(stage2), _mm256_extractf128_pd(stage2, 1));
-	return stage3;
-}
-
 inline FORCE_INLINE __m128 mm_rsqrt24_ps(__m128 x)
 {
 	__m128 tmp0 = _mm_rsqrt_ps(x);
@@ -1009,7 +1000,7 @@ class PredictorAVX512F final : public Predictor {
 public:
 	PredictorAVX512F(const PredictorModel &model, bool use_q2) :
 		m_model(create_interleaved_predictor_model(model)),
-		m_inv_filter_size{ 1.0 / (model.first.xdim * model.first.ydim) },
+		m_inv_filter_size{ 1.0 / (m_model.xdim * m_model.ydim) },
 		m_use_q2{ use_q2 }
 	{
 		assert(model.first.xdim * model.first.ydim <= 48 * 6);
