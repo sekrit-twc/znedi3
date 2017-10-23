@@ -1064,7 +1064,7 @@ void cubic_interpolation_avx512f(const void *src, ptrdiff_t src_stride, void *ds
 	const __m512 k0 = _mm512_set1_ps(-3.0f / 32.0f);
 	const __m512 k1 = _mm512_set1_ps(19.0f / 32.0f);
 
-	for (unsigned i = 0; i < n - (n % 16); i += 16) {
+	for (unsigned i = 0; i < n - n % 16; i += 16) {
 		__m512i pmask = _mm512_cvtepi8_epi32(_mm_load_si128((const __m128i *)(prescreen + i)));
 		__mmask16 mask = _mm512_cmp_epi32_mask(pmask, _mm512_setzero_si512(), _MM_CMPINT_NE);
 

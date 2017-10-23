@@ -95,5 +95,8 @@
     <ClCompile Include="..\..\znedi3\x86\kernel_avx2.cpp">
       <Filter>Source Files\x86</Filter>
     </ClCompile>
+    <ClCompile Include="..\..\znedi3\x86\kernel_f16c.cpp">
+      <Filter>Source Files\x86</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

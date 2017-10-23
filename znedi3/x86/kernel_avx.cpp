@@ -9,6 +9,12 @@
 
 namespace znedi3 {
 
+void cubic_interpolation_avx(const void *src, ptrdiff_t src_stride, void *dst, const unsigned char *prescreen, unsigned n)
+{
+	cubic_interpolation_avx_impl(src, src_stride, dst, prescreen, n);
+}
+
+
 std::unique_ptr<Prescreener> create_prescreener_old_avx(const PrescreenerOldCoefficients &coeffs, double pixel_half)
 {
 	return std::make_unique<PrescreenerOldAVX>(coeffs, pixel_half);

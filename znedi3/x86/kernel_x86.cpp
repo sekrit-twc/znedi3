@@ -25,6 +25,30 @@ pixel_io_func select_pixel_io_func_sse2(PixelType in, PixelType out)
 		return nullptr;
 }
 
+pixel_io_func select_pixel_io_func_f16c(PixelType in, PixelType out)
+{
+	if (in == PixelType::HALF && out == PixelType::FLOAT)
+		return half_to_float_f16c;
+	else if (in == PixelType::FLOAT && out == PixelType::HALF)
+		return float_to_half_f16c;
+	else
+		return nullptr;
+}
+
+pixel_io_func select_pixel_io_func_avx2(PixelType in, PixelType out)
+{
+	if (in == PixelType::BYTE && out == PixelType::FLOAT)
+		return byte_to_float_avx2;
+	else if (in == PixelType::WORD && out == PixelType::FLOAT)
+		return word_to_float_avx2;
+	else if (in == PixelType::FLOAT && out == PixelType::BYTE)
+		return float_to_byte_avx2;
+	else if (in == PixelType::FLOAT && out == PixelType::WORD)
+		return float_to_word_avx2;
+	else
+		return nullptr;
+}
+
 #ifdef ZNEDI3_X86_AVX512
 pixel_io_func select_pixel_io_func_avx512f(PixelType in, PixelType out)
 {
@@ -98,6 +122,10 @@ pixel_io_func select_pixel_io_func_x86(PixelType in, PixelType out, CPUClass cpu
 #ifdef ZNEDI3_X86_AVX512
 		if (!ret && cpu == CPUClass::AUTO_64B && caps.avx512f)
 			ret = select_pixel_io_func_avx512f(in, out);
+		if (!ret && caps.avx2)
+			ret = select_pixel_io_func_avx2(in, out);
+		if (!ret && caps.avx && caps.f16c)
+			ret = select_pixel_io_func_f16c(in, out);
 		if (!ret && caps.sse2)
 			ret = select_pixel_io_func_sse2(in, out);
 #endif
@@ -105,6 +133,10 @@ pixel_io_func select_pixel_io_func_x86(PixelType in, PixelType out, CPUClass cpu
 #ifdef ZNEDI3_X86_AVX512
 		if (!ret && cpu >= CPUClass::X86_AVX512)
 			ret = select_pixel_io_func_avx512f(in, out);
+		if (!ret && cpu >= CPUClass::X86_AVX2)
+			ret = select_pixel_io_func_avx2(in, out);
+		if (!ret && cpu >= CPUClass::X86_F16C)
+			ret = select_pixel_io_func_f16c(in, out);
 		if (!ret && cpu >= CPUClass::X86_SSE2)
 			ret = select_pixel_io_func_sse2(in, out);
 #endif
@@ -123,12 +155,20 @@ interpolate_func select_interpolate_func_x86(CPUClass cpu)
 		if (!ret && cpu == CPUClass::AUTO_64B && caps.avx512f)
 			ret = cubic_interpolation_avx512f;
 #endif
+		if (!ret && caps.avx2 && caps.fma)
+			ret = cubic_interpolation_avx2;
+		if (!ret && caps.avx)
+			ret = cubic_interpolation_avx;
 		if (!ret && caps.sse2)
 			ret = cubic_interpolation_sse2;
 	} else {
 #ifdef ZNEDI3_X86_AVX512
 		if (!ret && cpu >= CPUClass::X86_AVX512)
 			ret = cubic_interpolation_avx512f;
+		if (!ret && cpu >= CPUClass::X86_AVX2)
+			ret = cubic_interpolation_avx2;
+		if (!ret && cpu >= CPUClass::X86_AVX)
+			ret = cubic_interpolation_avx;
 		if (!ret && cpu >= CPUClass::X86_SSE2)
 			ret = cubic_interpolation_sse2;
 #endif

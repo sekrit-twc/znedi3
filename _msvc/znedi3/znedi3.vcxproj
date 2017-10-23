@@ -161,6 +161,16 @@
       <UseProcessorExtensions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">COMMON512</UseProcessorExtensions>
       <UseProcessorExtensions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">COMMON512</UseProcessorExtensions>
     </ClCompile>
+    <ClCompile Include="..\..\znedi3\x86\kernel_f16c.cpp">
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AdvancedVectorExtensions</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">AdvancedVectorExtensions</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">AdvancedVectorExtensions</EnableEnhancedInstructionSet>
+      <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AdvancedVectorExtensions</EnableEnhancedInstructionSet>
+      <UseProcessorExtensions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AVXI</UseProcessorExtensions>
+      <UseProcessorExtensions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">AVXI</UseProcessorExtensions>
+      <UseProcessorExtensions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">AVXI</UseProcessorExtensions>
+      <UseProcessorExtensions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AVXI</UseProcessorExtensions>
+    </ClCompile>
     <ClCompile Include="..\..\znedi3\x86\kernel_sse.cpp">
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">StreamingSIMDExtensions</EnableEnhancedInstructionSet>
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">StreamingSIMDExtensions</EnableEnhancedInstructionSet>

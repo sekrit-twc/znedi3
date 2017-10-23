@@ -872,6 +872,57 @@ public:
 	}
 };
 
+
+void cubic_interpolation_avx_impl(const void *src, ptrdiff_t src_stride, void *dst, const unsigned char *prescreen, unsigned n)
+{
+	const float *src_p = static_cast<const float *>(src);
+	float *dst_p = static_cast<float *>(dst);
+	ptrdiff_t src_stride_f = src_stride / sizeof(float);
+
+	const float *src_p0 = src_p - 2 * src_stride_f;
+	const float *src_p1 = src_p - 1 * src_stride_f;
+	const float *src_p2 = src_p + 0 * src_stride_f;
+	const float *src_p3 = src_p + 1 * src_stride_f;
+
+	const __m256 k0 = _mm256_set1_ps(-3.0f / 32.0f);
+	const __m256 k1 = _mm256_set1_ps(19.0f / 32.0f);
+
+	for (unsigned i = 0; i < n - (n % 8); i += 8) {
+		__m128i masklo = _mm_cvtsi32_si128(*(const uint32_t *)(prescreen + i + 0));
+		__m128i maskhi = _mm_cvtsi32_si128(*(const uint32_t *)(prescreen + i + 4));
+		masklo = _mm_unpacklo_epi8(masklo, masklo);
+		masklo = _mm_unpacklo_epi16(masklo, masklo);
+		maskhi = _mm_unpacklo_epi8(maskhi, maskhi);
+		maskhi = _mm_unpacklo_epi16(maskhi, maskhi);
+
+		__m256i mask = _mm256_insertf128_si256(_mm256_castsi128_si256(masklo), maskhi, 1);
+		__m256 orig = _mm256_load_ps(dst_p + i);
+		orig = _mm256_andnot_ps(_mm256_castsi256_ps(mask), orig);
+
+		__m256 accum = _mm256_mul_ps(k0, _mm256_load_ps(src_p0 + i));
+		accum = mm256_fmadd_ps(k1, _mm256_load_ps(src_p1 + i), accum);
+		accum = mm256_fmadd_ps(k1, _mm256_load_ps(src_p2 + i), accum);
+		accum = mm256_fmadd_ps(k0, _mm256_load_ps(src_p3 + i), accum);
+
+		accum = _mm256_and_ps(_mm256_castsi256_ps(mask), accum);
+		accum = _mm256_or_ps(orig, accum);
+
+		_mm256_store_ps(dst_p + i, accum);
+	}
+	for (unsigned i = n - (n % 8); i < n; ++i) {
+		if (!prescreen[i])
+			continue;
+
+		float accum = 0.0f;
+		accum += (-3.0f / 32.0f) * src_p0[i];
+		accum += (19.0f / 32.0f) * src_p1[i];
+		accum += (19.0f / 32.0f) * src_p2[i];
+		accum += (-3.0f / 32.0f) * src_p3[i];
+
+		dst_p[i] = accum;
+	}
+}
+
 } // namespace
 } // namespace znedi3
 
