@@ -64,6 +64,13 @@ std::unique_ptr<Prescreener> create_prescreener_new_sse(const PrescreenerNewCoef
 std::unique_ptr<Predictor> create_predictor_sse(const PredictorModel &model, bool use_q2);
 
 // SSE2
+void byte_to_float_sse2(const void *src, void *dst, size_t n);
+void word_to_float_sse2(const void *src, void *dst, size_t n);
+void float_to_byte_sse2(const void *src, void *dst, size_t n);
+void float_to_word_sse2(const void *src, void *dst, size_t n);
+
+void cubic_interpolation_sse2(const void *src, ptrdiff_t src_stride, void *dst, const unsigned char *prescreen, unsigned n);
+
 std::unique_ptr<Predictor> create_predictor_sse2(const PredictorModel &model, bool use_q2);
 
 // AVX

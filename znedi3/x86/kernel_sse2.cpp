@@ -1,5 +1,6 @@
 #ifdef ZNEDI3_X86
 
+#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <emmintrin.h>
@@ -179,6 +180,142 @@ public:
 };
 
 } // namespace
+
+
+void byte_to_float_sse2(const void *src, void *dst, size_t n)
+{
+	const uint8_t *src_p = static_cast<const uint8_t *>(src);
+	float *dst_p = static_cast<float *>(dst);
+
+	for (size_t i = 0; i < n - n % 16; i += 16) {
+		__m128i tmp = _mm_load_si128((const __m128i *)(src_p + i));
+		__m128i lo = _mm_unpacklo_epi8(tmp, _mm_setzero_si128());
+		__m128i hi = _mm_unpackhi_epi8(tmp, _mm_setzero_si128());
+		__m128i lolo = _mm_unpacklo_epi16(lo, _mm_setzero_si128());
+		__m128i lohi = _mm_unpackhi_epi16(lo, _mm_setzero_si128());
+		__m128i hilo = _mm_unpacklo_epi16(hi, _mm_setzero_si128());
+		__m128i hihi = _mm_unpackhi_epi16(hi, _mm_setzero_si128());
+
+		_mm_store_ps(dst_p + i + 0, _mm_cvtepi32_ps(lolo));
+		_mm_store_ps(dst_p + i + 4, _mm_cvtepi32_ps(lohi));
+		_mm_store_ps(dst_p + i + 8, _mm_cvtepi32_ps(hilo));
+		_mm_store_ps(dst_p + i + 12, _mm_cvtepi32_ps(hihi));
+	}
+	for (size_t i = n - n % 16; i < n; ++i) {
+		dst_p[i] = src_p[i];
+	}
+}
+
+void word_to_float_sse2(const void *src, void *dst, size_t n)
+{
+	const uint16_t *src_p = static_cast<const uint16_t *>(src);
+	float *dst_p = static_cast<float *>(dst);
+
+	for (size_t i = 0; i < n - n % 8; i += 8) {
+		__m128i tmp = _mm_load_si128((const __m128i *)(src_p + i));
+		__m128i lo = _mm_unpacklo_epi16(tmp, _mm_setzero_si128());
+		__m128i hi = _mm_unpackhi_epi16(tmp, _mm_setzero_si128());
+
+		_mm_store_ps(dst_p + i + 0, _mm_cvtepi32_ps(lo));
+		_mm_store_ps(dst_p + i + 8, _mm_cvtepi32_ps(lo));
+	}
+	for (size_t i = n - n % 8; i < n; ++i) {
+		dst_p[i] = src_p[i];
+	}
+}
+
+void float_to_byte_sse2(const void *src, void *dst, size_t n)
+{
+	const float *src_p = static_cast<const float *>(src);
+	uint8_t *dst_p = static_cast<uint8_t *>(dst);
+
+	for (size_t i = 0; i < n - n % 16; i += 16) {
+		__m128i lolo = _mm_cvtps_epi32(_mm_load_ps(src_p + i + 0));
+		__m128i lohi = _mm_cvtps_epi32(_mm_load_ps(src_p + i + 4));
+		__m128i hilo = _mm_cvtps_epi32(_mm_load_ps(src_p + i + 8));
+		__m128i hihi = _mm_cvtps_epi32(_mm_load_ps(src_p + i + 12));
+
+		__m128i lo = _mm_packs_epi32(lolo, lohi);
+		__m128i hi = _mm_packs_epi32(hilo, hihi);
+		__m128i x = _mm_packus_epi16(lo, hi);
+		_mm_store_si128((__m128i *)(dst_p + i), x);
+	}
+	for (size_t i = n - n % 16; i < n; ++i) {
+		int32_t x = _mm_cvtss_si32(_mm_set_ss(src_p[i]));
+		x = std::min(std::max(x, static_cast<int32_t>(0)), static_cast<int32_t>(UINT8_MAX));
+		dst_p[i] = static_cast<uint8_t>(x);
+	}
+}
+
+void float_to_word_sse2(const void *src, void *dst, size_t n)
+{
+	const float *src_p = static_cast<const float *>(src);
+	uint16_t *dst_p = static_cast<uint16_t *>(dst);
+
+	for (size_t i = 0; i < n - n % 8; i += 8) {
+		__m128i lo = _mm_cvtps_epi32(_mm_load_ps(src_p + i + 0));
+		__m128i hi = _mm_cvtps_epi32(_mm_load_ps(src_p + i + 8));
+
+		lo = _mm_add_epi32(lo, _mm_set1_epi32(INT16_MIN));
+		hi = _mm_add_epi32(hi, _mm_set1_epi32(INT16_MIN));
+
+		__m128i x = _mm_packus_epi16(lo, hi);
+		x = _mm_sub_epi16(x, _mm_set1_epi16(INT16_MIN));
+
+		_mm_store_si128((__m128i *)(dst_p + i), x);
+	}
+	for (size_t i = n - n % 8; i < n; ++i) {
+		int32_t x = _mm_cvtss_si32(_mm_set_ss(src_p[i]));
+		x = std::min(std::max(x, static_cast<int32_t>(0)), static_cast<int32_t>(UINT16_MAX));
+		dst_p[i] = static_cast<uint8_t>(x);
+	}
+}
+
+void cubic_interpolation_sse2(const void *src, ptrdiff_t src_stride, void *dst, const unsigned char *prescreen, unsigned n)
+{
+	const float *src_p = static_cast<const float *>(src);
+	float *dst_p = static_cast<float *>(dst);
+	ptrdiff_t src_stride_f = src_stride / sizeof(float);
+
+	const float *src_p0 = src_p - 2 * src_stride_f;
+	const float *src_p1 = src_p - 1 * src_stride_f;
+	const float *src_p2 = src_p + 0 * src_stride_f;
+	const float *src_p3 = src_p + 1 * src_stride_f;
+
+	const __m128 k0 = _mm_set_ps1(-3.0f / 32.0f);
+	const __m128 k1 = _mm_set_ps1(19.0f / 32.0f);
+
+	for (unsigned i = 0; i < n - n % 4; i += 4) {
+		__m128i mask = _mm_cvtsi32_si128(*(const uint32_t *)(prescreen + i));
+		mask = _mm_unpacklo_epi8(mask, mask);
+		mask = _mm_unpacklo_epi16(mask, mask);
+
+		__m128 orig = _mm_load_ps(dst_p + i);
+		orig = _mm_andnot_ps(_mm_castsi128_ps(mask), orig);
+
+		__m128 accum = _mm_mul_ps(k0, _mm_load_ps(src_p0 + i));
+		accum = _mm_add_ps(accum, _mm_mul_ps(k1, _mm_load_ps(src_p1 + i)));
+		accum = _mm_add_ps(accum, _mm_mul_ps(k1, _mm_load_ps(src_p2 + i)));
+		accum = _mm_add_ps(accum, _mm_mul_ps(k0, _mm_load_ps(src_p3 + i)));
+
+		accum = _mm_and_ps(_mm_castsi128_ps(mask), accum);
+		accum = _mm_or_ps(orig, accum);
+
+		_mm_store_ps(dst_p + i, accum);
+	}
+	for (unsigned i = n - n % 4; i < n; ++i) {
+		if (!prescreen[i])
+			continue;
+
+		float accum = 0.0f;
+		accum += (-3.0f / 32.0f) * src_p0[i];
+		accum += (19.0f / 32.0f) * src_p1[i];
+		accum += (19.0f / 32.0f) * src_p2[i];
+		accum += (-3.0f / 32.0f) * src_p3[i];
+
+		dst_p[i] = accum;
+	}
+}
 
 
 std::unique_ptr<Predictor> create_predictor_sse2(const PredictorModel &model, bool use_q2)
