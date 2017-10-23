@@ -310,7 +310,7 @@ inline FORCE_INLINE void prescreener_old_layer2_avx512(const float kernel[4][8],
 	bias0 = _mm512_set1_ps(bias[0]);
 	bias1 = _mm512_set1_ps(bias[1]);
 
-	// Evaluate 2x8 convolution.
+	// Compute 2x8 convolution.
 	for (unsigned i = 0; i < n; i += 16) {
 		__m512 x0 = _mm512_load_ps(activation + 0 * activation_stride_f + i);
 		__m512 x1 = _mm512_load_ps(activation + 1 * activation_stride_f + i);
@@ -373,7 +373,7 @@ inline FORCE_INLINE void prescreener_old_layer2_avx512(const float kernel[4][8],
 	bias0 = _mm512_set1_ps(bias[2]);
 	bias1 = _mm512_set1_ps(bias[3]);
 
-	// Evaluate 2x8 convolution.
+	// Compute 2x8 convolution.
 	for (unsigned i = 0; i < n; i += 16) {
 		__m512 x0 = _mm512_load_ps(activation + 0 * activation_stride_f + i);
 		__m512 x1 = _mm512_load_ps(activation + 1 * activation_stride_f + i);
@@ -413,7 +413,6 @@ inline FORCE_INLINE void prescreener_old_layer2_avx512(const float kernel[4][8],
 		accum0a = _mm512_max_ps(accum0a, accum1a);
 
 		__m512 activation89 = _mm512_load_ps(activation + 8 * activation_stride_f + i);
-		__m512 debug = _mm512_sub_ps(activation89, accum0a);
 		__mmask16 result = _mm512_cmp_ps_mask(accum0a, activation89, _CMP_LE_OQ);
 
 		__m128i prescreen_mask = _mm512_maskz_cvtusepi32_epi8(result, _mm512_set1_epi32(0xFFFFFFFFUL));

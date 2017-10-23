@@ -121,6 +121,240 @@ inline FORCE_INLINE __m256 mm256_elliott_ps(__m256 x)
 }
 
 
+inline FORCE_INLINE void prescreener_old_layer0_avx(const float kernel[4][48], const float bias[4], const float *window, ptrdiff_t src_stride,
+                                                    float *activation, ptrdiff_t activation_stride, unsigned n)
+{
+	ptrdiff_t activation_stride_f = activation_stride / sizeof(float);
+
+	for (unsigned i = 0; i < n; i += 8) {
+		_mm256_store_ps(activation + 0 * activation_stride_f + i, _mm256_setzero_ps());
+		_mm256_store_ps(activation + 1 * activation_stride_f + i, _mm256_setzero_ps());
+		_mm256_store_ps(activation + 2 * activation_stride_f + i, _mm256_setzero_ps());
+		_mm256_store_ps(activation + 3 * activation_stride_f + i, _mm256_setzero_ps());
+	}
+
+	// Compute 48x4 convolution.
+	for (unsigned k = 0; k < 4; ++k) {
+		const float *window_p = window + k * (src_stride / sizeof(float));
+
+		for (unsigned kk = 0; kk < 12; kk += 2) {
+			const __m256 n0_c0 = _mm256_broadcast_ss(&kernel[0][12 * k + kk + 0]);
+			const __m256 n0_c1 = _mm256_broadcast_ss(&kernel[0][12 * k + kk + 1]);
+
+			const __m256 n1_c0 = _mm256_broadcast_ss(&kernel[1][12 * k + kk + 0]);
+			const __m256 n1_c1 = _mm256_broadcast_ss(&kernel[1][12 * k + kk + 1]);
+
+			const __m256 n2_c0 = _mm256_broadcast_ss(&kernel[2][12 * k + kk + 0]);
+			const __m256 n2_c1 = _mm256_broadcast_ss(&kernel[2][12 * k + kk + 1]);
+
+			const __m256 n3_c0 = _mm256_broadcast_ss(&kernel[3][12 * k + kk + 0]);
+			const __m256 n3_c1 = _mm256_broadcast_ss(&kernel[3][12 * k + kk + 1]);
+
+			for (unsigned i = 0; i < n; i += 8) {
+				__m256 x0 = _mm256_loadu_ps(window_p + i + kk);
+				__m256 x4 = _mm256_loadu_ps(window_p + i + kk + 4);
+
+				__m256 x1 = _mm256_castsi256_ps(_mm256_alignr_epi8(_mm256_castps_si256(x4), _mm256_castps_si256(x0), 4));
+				__m256 x2 = _mm256_castsi256_ps(_mm256_alignr_epi8(_mm256_castps_si256(x4), _mm256_castps_si256(x0), 8));
+				__m256 x3 = _mm256_castsi256_ps(_mm256_alignr_epi8(_mm256_castps_si256(x4), _mm256_castps_si256(x0), 12));
+
+				__m256 accum0 = _mm256_load_ps(activation + 0 * activation_stride_f + i);
+				__m256 accum1 = _mm256_load_ps(activation + 1 * activation_stride_f + i);
+				__m256 accum2 = _mm256_load_ps(activation + 2 * activation_stride_f + i);
+				__m256 accum3 = _mm256_load_ps(activation + 3 * activation_stride_f + i);
+
+				accum0 = mm256_fmadd_ps(n0_c0, x0, accum0);
+				accum0 = mm256_fmadd_ps(n0_c1, x1, accum0);
+
+				accum1 = mm256_fmadd_ps(n1_c0, x0, accum1);
+				accum1 = mm256_fmadd_ps(n1_c1, x1, accum1);
+
+				accum2 = mm256_fmadd_ps(n2_c0, x0, accum2);
+				accum2 = mm256_fmadd_ps(n2_c1, x1, accum2);
+
+				accum3 = mm256_fmadd_ps(n3_c0, x0, accum3);
+				accum3 = mm256_fmadd_ps(n3_c1, x1, accum3);
+
+				_mm256_store_ps(activation + 0 * activation_stride_f + i, accum0);
+				_mm256_store_ps(activation + 1 * activation_stride_f + i, accum1);
+				_mm256_store_ps(activation + 2 * activation_stride_f + i, accum2);
+				_mm256_store_ps(activation + 3 * activation_stride_f + i, accum3);
+			}
+		}
+	}
+
+	// Add bias and apply elliott function.
+	const __m256 bias0 = _mm256_broadcast_ss(bias + 0);
+	const __m256 bias1 = _mm256_broadcast_ss(bias + 1);
+	const __m256 bias2 = _mm256_broadcast_ss(bias + 2);
+	const __m256 bias3 = _mm256_broadcast_ss(bias + 3);
+
+	for (unsigned i = 0; i < n; i += 8) {
+		__m256 n0 = _mm256_load_ps(activation + 0 * activation_stride_f + i);
+		__m256 n1 = _mm256_load_ps(activation + 1 * activation_stride_f + i);
+		__m256 n2 = _mm256_load_ps(activation + 2 * activation_stride_f + i);
+		__m256 n3 = _mm256_load_ps(activation + 3 * activation_stride_f + i);
+
+		n0 = _mm256_add_ps(n0, bias0);
+		n1 = _mm256_add_ps(n1, bias1);
+		n2 = _mm256_add_ps(n2, bias2);
+		n3 = _mm256_add_ps(n3, bias3);
+
+		n1 = mm256_elliott_ps(n1);
+		n2 = mm256_elliott_ps(n2);
+		n3 = mm256_elliott_ps(n3);
+
+		_mm256_store_ps(activation + 0 * activation_stride_f + i, n0);
+		_mm256_store_ps(activation + 1 * activation_stride_f + i, n1);
+		_mm256_store_ps(activation + 2 * activation_stride_f + i, n2);
+		_mm256_store_ps(activation + 3 * activation_stride_f + i, n3);
+	}
+}
+
+inline FORCE_INLINE void prescreener_old_layer1_avx(const float kernel[4][4], const float bias[4], float *activation, ptrdiff_t activation_stride, unsigned n)
+{
+	const ptrdiff_t activation_stride_f = activation_stride / sizeof(float);
+
+	for (unsigned k = 0; k < 4; k += 2) {
+		const __m256 n0_c0 = _mm256_broadcast_ss(&kernel[k + 0][0]);
+		const __m256 n0_c1 = _mm256_broadcast_ss(&kernel[k + 0][1]);
+		const __m256 n0_c2 = _mm256_broadcast_ss(&kernel[k + 0][2]);
+		const __m256 n0_c3 = _mm256_broadcast_ss(&kernel[k + 0][3]);
+
+		const __m256 n1_c0 = _mm256_broadcast_ss(&kernel[k + 1][0]);
+		const __m256 n1_c1 = _mm256_broadcast_ss(&kernel[k + 1][1]);
+		const __m256 n1_c2 = _mm256_broadcast_ss(&kernel[k + 1][2]);
+		const __m256 n1_c3 = _mm256_broadcast_ss(&kernel[k + 1][3]);
+
+		const __m256 bias0 = _mm256_broadcast_ss(bias + k + 0);
+		const __m256 bias1 = _mm256_broadcast_ss(bias + k + 1);
+
+		// Compute 2x4 convolution.
+		for (unsigned i = 0; i < n; i += 8) {
+			__m256 x0 = _mm256_load_ps(activation + 0 * activation_stride_f + i);
+			__m256 x1 = _mm256_load_ps(activation + 1 * activation_stride_f + i);
+			__m256 x2 = _mm256_load_ps(activation + 2 * activation_stride_f + i);
+			__m256 x3 = _mm256_load_ps(activation + 3 * activation_stride_f + i);
+
+			__m256 accum0 = _mm256_fmadd_ps(n0_c0, x0, bias0);
+			__m256 accum1 = _mm256_fmadd_ps(n1_c0, x0, bias1);
+
+			accum0 = _mm256_fmadd_ps(n0_c1, x1, accum0);
+			accum1 = _mm256_fmadd_ps(n1_c1, x1, accum1);
+
+			accum0 = _mm256_fmadd_ps(n0_c2, x2, accum0);
+			accum1 = _mm256_fmadd_ps(n1_c2, x2, accum1);
+
+			accum0 = _mm256_fmadd_ps(n0_c3, x3, accum0);
+			accum1 = _mm256_fmadd_ps(n1_c3, x3, accum1);
+
+			accum0 = mm256_elliott_ps(accum0);
+			accum1 = mm256_elliott_ps(accum1);
+
+			_mm256_store_ps(activation + (4 + k) * activation_stride_f + i, accum0);
+			_mm256_store_ps(activation + (5 + k) * activation_stride_f + i, accum1);
+		}
+	}
+}
+
+inline FORCE_INLINE void prescreener_old_layer2_avx(const float kernel[4][8], const float bias[4], float *activation, ptrdiff_t activation_stride,
+                                                    unsigned char *prescreen, unsigned n)
+{
+	const ptrdiff_t activation_stride_f = activation_stride / sizeof(float);
+
+	for (unsigned k = 0; k < 4; ++k) {
+		__m256 c0 = _mm256_broadcast_ss(&kernel[k][0]);
+		__m256 c1 = _mm256_broadcast_ss(&kernel[k][1]);
+		__m256 c2 = _mm256_broadcast_ss(&kernel[k][2]);
+		__m256 c3 = _mm256_broadcast_ss(&kernel[k][3]);
+		__m256 c4 = _mm256_broadcast_ss(&kernel[k][4]);
+		__m256 c5 = _mm256_broadcast_ss(&kernel[k][5]);
+		__m256 c6 = _mm256_broadcast_ss(&kernel[k][6]);
+		__m256 c7 = _mm256_broadcast_ss(&kernel[k][7]);
+		__m256 bias_ps = _mm256_broadcast_ss(bias + k);
+
+		// Compute 1x8 convolution.
+		for (unsigned i = 0; i < n; i += 8) {
+			__m256 x0 = _mm256_load_ps(activation + 0 * activation_stride_f + i);
+			__m256 x1 = _mm256_load_ps(activation + 1 * activation_stride_f + i);
+			__m256 x2 = _mm256_load_ps(activation + 2 * activation_stride_f + i);
+			__m256 x3 = _mm256_load_ps(activation + 3 * activation_stride_f + i);
+			__m256 x4 = _mm256_load_ps(activation + 4 * activation_stride_f + i);
+			__m256 x5 = _mm256_load_ps(activation + 5 * activation_stride_f + i);
+			__m256 x6 = _mm256_load_ps(activation + 6 * activation_stride_f + i);
+			__m256 x7 = _mm256_load_ps(activation + 7 * activation_stride_f + i);
+			__m256 accum0, accum1;
+
+			accum0 = mm256_fmadd_ps(c0, x0, bias_ps);
+			accum1 = _mm256_mul_ps(c1, x1);
+			accum0 = mm256_fmadd_ps(c2, x2, accum0);
+			accum1 = mm256_fmadd_ps(c3, x3, accum1);
+			accum0 = mm256_fmadd_ps(c4, x4, accum0);
+			accum1 = mm256_fmadd_ps(c5, x5, accum1);
+			accum0 = mm256_fmadd_ps(c6, x6, accum0);
+			accum1 = mm256_fmadd_ps(c7, x7, accum1);
+
+			accum0 = _mm256_add_ps(accum0, accum1);
+			_mm256_store_ps(activation + (8 + k) * activation_stride_f + i, accum0);
+		}
+	}
+
+	// Collapse neurons.
+	for (unsigned i = 0; i < n; i += 8) {
+		__m256 activation8 = _mm256_load_ps(activation + 8 * activation_stride_f + i);
+		__m256 activation9 = _mm256_load_ps(activation + 9 * activation_stride_f + i);
+		__m256 activation10 = _mm256_load_ps(activation + 10 * activation_stride_f + i);
+		__m256 activation11 = _mm256_load_ps(activation + 11 * activation_stride_f + i);
+
+		activation8 = _mm256_max_ps(activation8, activation9);
+		activation10 = _mm256_max_ps(activation10, activation11);
+
+		__m256 mask = _mm256_cmp_ps(activation10, activation8, _CMP_LE_OQ);
+		__m128i mask_lo = _mm_castps_si128(_mm256_castps256_ps128(mask));
+		__m128i mask_hi = _mm_castps_si128(_mm256_extractf128_ps(mask, 1));
+
+		__m128i prescreen_mask = _mm_packs_epi16(_mm_packs_epi32(mask_lo, mask_hi), _mm_setzero_si128());
+		_mm_storel_epi64((__m128i *)(prescreen + i), prescreen_mask);
+	}
+}
+
+
+class PrescreenerOldAVX final : public Prescreener {
+	PrescreenerOldCoefficients m_data;
+public:
+	PrescreenerOldAVX(const PrescreenerOldCoefficients &data, double half) :
+		m_data(data)
+	{
+		subtract_mean(m_data, half);
+	}
+
+	size_t get_tmp_size() const override
+	{
+		return 12 * 512 * sizeof(float);
+	}
+
+	void process(const void *src, ptrdiff_t src_stride, unsigned char *prescreen, void *tmp, unsigned n) const override
+	{
+		float *activation = static_cast<float *>(tmp);
+		ptrdiff_t activation_stride = 512 * sizeof(float);
+
+		const float *src_p = static_cast<const float *>(src);
+		ptrdiff_t src_stride_f = src_stride / sizeof(float);
+
+		// Adjust source pointer to point to top-left of filter window.
+		const float *window = src_p - 2 * src_stride_f - 5;
+
+		for (unsigned i = 0; i < n; i += 512) {
+			unsigned nn = i + 512 > n ? n - i : 512;
+
+			prescreener_old_layer0_avx(m_data.kernel_l0, m_data.bias_l0, window + i, src_stride, activation, activation_stride, nn);
+			prescreener_old_layer1_avx(m_data.kernel_l1, m_data.bias_l1, activation, activation_stride, nn);
+			prescreener_old_layer2_avx(m_data.kernel_l2, m_data.bias_l2, activation, activation_stride, prescreen + i, nn);
+		}
+	}
+};
+
+
 inline FORCE_INLINE void gather_pixels_avx(const float *src, ptrdiff_t src_stride, ptrdiff_t xdim, ptrdiff_t ydim, float *buf, __m256d *partial_sum_sumsq)
 {
 	ptrdiff_t src_stride_f = src_stride / sizeof(float);

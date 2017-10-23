@@ -67,9 +67,11 @@ std::unique_ptr<Predictor> create_predictor_sse(const PredictorModel &model, boo
 std::unique_ptr<Predictor> create_predictor_sse2(const PredictorModel &model, bool use_q2);
 
 // AVX
+std::unique_ptr<Prescreener> create_prescreener_old_avx(const PrescreenerOldCoefficients &coeffs, double pixel_half);
 std::unique_ptr<Predictor> create_predictor_avx(const PredictorModel &model, bool use_q2);
 
 // AVX2
+std::unique_ptr<Prescreener> create_prescreener_old_avx2(const PrescreenerOldCoefficients &coeffs, double pixel_half);
 std::unique_ptr<Predictor> create_predictor_avx2(const PredictorModel &model, bool use_q2);
 
 // AVX-512F
