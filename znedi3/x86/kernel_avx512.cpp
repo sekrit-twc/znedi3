@@ -108,18 +108,16 @@ inline FORCE_INLINE __m512 mm512_elliott_ps(__m512 x)
 inline FORCE_INLINE void prescreener_old_layer0_avx512(const float kernel[4][48], const float bias[4], const float *window, ptrdiff_t src_stride,
                                                        float *activation, ptrdiff_t activation_stride, unsigned n)
 {
-	float *activation_p0 = activation + 0 * (activation_stride / sizeof(float));
-	float *activation_p1 = activation + 1 * (activation_stride / sizeof(float));
-	float *activation_p2 = activation + 2 * (activation_stride / sizeof(float));
-	float *activation_p3 = activation + 3 * (activation_stride / sizeof(float));
+	const ptrdiff_t activation_stride_f = activation_stride / sizeof(float);
 
 	for (unsigned i = 0; i < n; i += 16) {
-		_mm512_store_ps(activation_p0 + i, _mm512_setzero_ps());
-		_mm512_store_ps(activation_p1 + i, _mm512_setzero_ps());
-		_mm512_store_ps(activation_p2 + i, _mm512_setzero_ps());
-		_mm512_store_ps(activation_p3 + i, _mm512_setzero_ps());
+		_mm512_store_ps(activation + 0 * activation_stride_f + i, _mm512_setzero_ps());
+		_mm512_store_ps(activation + 1 * activation_stride_f + i, _mm512_setzero_ps());
+		_mm512_store_ps(activation + 2 * activation_stride_f + i, _mm512_setzero_ps());
+		_mm512_store_ps(activation + 3 * activation_stride_f + i, _mm512_setzero_ps());
 	}
 
+	// Compute 48x4 convolution.
 	for (unsigned k = 0; k < 4; ++k) {
 		const float *window_p = window + k * (src_stride / sizeof(float));
 
@@ -152,10 +150,10 @@ inline FORCE_INLINE void prescreener_old_layer0_avx512(const float kernel[4][48]
 				__m512 x2 = _mm512_castsi512_ps(_mm512_alignr_epi8(_mm512_castps_si512(x4), _mm512_castps_si512(x0), 8));
 				__m512 x3 = _mm512_castsi512_ps(_mm512_alignr_epi8(_mm512_castps_si512(x4), _mm512_castps_si512(x0), 12));
 
-				__m512 accum0 = _mm512_load_ps(activation_p0 + i);
-				__m512 accum1 = _mm512_load_ps(activation_p1 + i);
-				__m512 accum2 = _mm512_load_ps(activation_p2 + i);
-				__m512 accum3 = _mm512_load_ps(activation_p3 + i);
+				__m512 accum0 = _mm512_load_ps(activation + 0 * activation_stride_f + i);
+				__m512 accum1 = _mm512_load_ps(activation + 1 * activation_stride_f + i);
+				__m512 accum2 = _mm512_load_ps(activation + 2 * activation_stride_f + i);
+				__m512 accum3 = _mm512_load_ps(activation + 3 * activation_stride_f + i);
 
 				accum0 = _mm512_fmadd_ps(n0_c0, x0, accum0);
 				accum0 = _mm512_fmadd_ps(n0_c1, x1, accum0);
@@ -177,10 +175,10 @@ inline FORCE_INLINE void prescreener_old_layer0_avx512(const float kernel[4][48]
 				accum3 = _mm512_fmadd_ps(n3_c2, x2, accum3);
 				accum3 = _mm512_fmadd_ps(n3_c3, x3, accum3);
 
-				_mm512_store_ps(activation_p0 + i, accum0);
-				_mm512_store_ps(activation_p1 + i, accum1);
-				_mm512_store_ps(activation_p2 + i, accum2);
-				_mm512_store_ps(activation_p3 + i, accum3);
+				_mm512_store_ps(activation + 0 * activation_stride_f + i, accum0);
+				_mm512_store_ps(activation + 1 * activation_stride_f + i, accum1);
+				_mm512_store_ps(activation + 2 * activation_stride_f + i, accum2);
+				_mm512_store_ps(activation + 3 * activation_stride_f + i, accum3);
 			}
 		}
 	}
@@ -192,10 +190,10 @@ inline FORCE_INLINE void prescreener_old_layer0_avx512(const float kernel[4][48]
 	const __m512 bias3 = _mm512_set1_ps(bias[3]);
 
 	for (unsigned i = 0; i < n; i += 16) {
-		__m512 n0 = _mm512_load_ps(activation_p0 + i);
-		__m512 n1 = _mm512_load_ps(activation_p1 + i);
-		__m512 n2 = _mm512_load_ps(activation_p2 + i);
-		__m512 n3 = _mm512_load_ps(activation_p3 + i);
+		__m512 n0 = _mm512_load_ps(activation + 0 * activation_stride_f + i);
+		__m512 n1 = _mm512_load_ps(activation + 1 * activation_stride_f + i);
+		__m512 n2 = _mm512_load_ps(activation + 2 * activation_stride_f + i);
+		__m512 n3 = _mm512_load_ps(activation + 3 * activation_stride_f + i);
 
 		n0 = _mm512_add_ps(n0, bias0);
 		n1 = _mm512_add_ps(n1, bias1);
@@ -206,15 +204,17 @@ inline FORCE_INLINE void prescreener_old_layer0_avx512(const float kernel[4][48]
 		n2 = mm512_elliott_ps(n2);
 		n3 = mm512_elliott_ps(n3);
 
-		_mm512_store_ps(activation_p0 + i, n0);
-		_mm512_store_ps(activation_p1 + i, n1);
-		_mm512_store_ps(activation_p2 + i, n2);
-		_mm512_store_ps(activation_p3 + i, n3);
+		_mm512_store_ps(activation + 0 * activation_stride_f + i, n0);
+		_mm512_store_ps(activation + 1 * activation_stride_f + i, n1);
+		_mm512_store_ps(activation + 2 * activation_stride_f + i, n2);
+		_mm512_store_ps(activation + 3 * activation_stride_f + i, n3);
 	}
 }
 
 inline FORCE_INLINE void prescreener_old_layer1_avx512(const float kernel[4][4], const float bias[4], float *activation, ptrdiff_t activation_stride, unsigned n)
 {
+	const ptrdiff_t activation_stride_f = activation_stride / sizeof(float);
+
 	const __m512 n0_c0 = _mm512_set1_ps(kernel[0][0]);
 	const __m512 n0_c1 = _mm512_set1_ps(kernel[0][1]);
 	const __m512 n0_c2 = _mm512_set1_ps(kernel[0][2]);
@@ -240,20 +240,12 @@ inline FORCE_INLINE void prescreener_old_layer1_avx512(const float kernel[4][4],
 	const __m512 bias2 = _mm512_set1_ps(bias[2]);
 	const __m512 bias3 = _mm512_set1_ps(bias[3]);
 
-	float *activation_p0 = activation + 0 * (activation_stride / sizeof(float));
-	float *activation_p1 = activation + 1 * (activation_stride / sizeof(float));
-	float *activation_p2 = activation + 2 * (activation_stride / sizeof(float));
-	float *activation_p3 = activation + 3 * (activation_stride / sizeof(float));
-	float *activation_p4 = activation + 4 * (activation_stride / sizeof(float));
-	float *activation_p5 = activation + 5 * (activation_stride / sizeof(float));
-	float *activation_p6 = activation + 6 * (activation_stride / sizeof(float));
-	float *activation_p7 = activation + 7 * (activation_stride / sizeof(float));
-
+	// Compute 4x4 convolution.
 	for (unsigned i = 0; i < n; i += 16) {
-		__m512 x0 = _mm512_load_ps(activation_p0 + i);
-		__m512 x1 = _mm512_load_ps(activation_p1 + i);
-		__m512 x2 = _mm512_load_ps(activation_p2 + i);
-		__m512 x3 = _mm512_load_ps(activation_p3 + i);
+		__m512 x0 = _mm512_load_ps(activation + 0 * activation_stride_f + i);
+		__m512 x1 = _mm512_load_ps(activation + 1 * activation_stride_f + i);
+		__m512 x2 = _mm512_load_ps(activation + 2 * activation_stride_f + i);
+		__m512 x3 = _mm512_load_ps(activation + 3 * activation_stride_f + i);
 
 		__m512 accum0 = _mm512_fmadd_ps(n0_c0, x0, bias0);
 		__m512 accum1 = _mm512_fmadd_ps(n1_c0, x0, bias1);
@@ -280,29 +272,21 @@ inline FORCE_INLINE void prescreener_old_layer1_avx512(const float kernel[4][4],
 		accum2 = mm512_elliott_ps(accum2);
 		accum3 = mm512_elliott_ps(accum3);
 
-		_mm512_store_ps(activation_p4 + i, accum0);
-		_mm512_store_ps(activation_p5 + i, accum1);
-		_mm512_store_ps(activation_p6 + i, accum2);
-		_mm512_store_ps(activation_p7 + i, accum3);
+		_mm512_store_ps(activation + 4 * activation_stride_f + i, accum0);
+		_mm512_store_ps(activation + 5 * activation_stride_f + i, accum1);
+		_mm512_store_ps(activation + 6 * activation_stride_f + i, accum2);
+		_mm512_store_ps(activation + 7 * activation_stride_f + i, accum3);
 	}
 }
 
 inline FORCE_INLINE void prescreener_old_layer2_avx512(const float kernel[4][8], const float bias[4], float *activation, ptrdiff_t activation_stride,
                                                        unsigned char *prescreen, unsigned n)
 {
+	const ptrdiff_t activation_stride_f = activation_stride / sizeof(float);
+
 	__m512 n0_c0, n0_c1, n0_c2, n0_c3, n0_c4, n0_c5, n0_c6, n0_c7;
 	__m512 n1_c0, n1_c1, n1_c2, n1_c3, n1_c4, n1_c5, n1_c6, n1_c7;
 	__m512 bias0, bias1;
-
-	float *activation_p0 = activation + 0 * (activation_stride / sizeof(float));
-	float *activation_p1 = activation + 1 * (activation_stride / sizeof(float));
-	float *activation_p2 = activation + 2 * (activation_stride / sizeof(float));
-	float *activation_p3 = activation + 3 * (activation_stride / sizeof(float));
-	float *activation_p4 = activation + 4 * (activation_stride / sizeof(float));
-	float *activation_p5 = activation + 5 * (activation_stride / sizeof(float));
-	float *activation_p6 = activation + 6 * (activation_stride / sizeof(float));
-	float *activation_p7 = activation + 7 * (activation_stride / sizeof(float));
-	float *activation_p8 = activation + 8 * (activation_stride / sizeof(float));
 
 	// Evaluate and collapse neurons 0 and 1.
 	n0_c0 = _mm512_set1_ps(kernel[0][0]);
@@ -326,15 +310,16 @@ inline FORCE_INLINE void prescreener_old_layer2_avx512(const float kernel[4][8],
 	bias0 = _mm512_set1_ps(bias[0]);
 	bias1 = _mm512_set1_ps(bias[1]);
 
+	// Evaluate 2x8 convolution.
 	for (unsigned i = 0; i < n; i += 16) {
-		__m512 x0 = _mm512_load_ps(activation_p0 + i);
-		__m512 x1 = _mm512_load_ps(activation_p1 + i);
-		__m512 x2 = _mm512_load_ps(activation_p2 + i);
-		__m512 x3 = _mm512_load_ps(activation_p3 + i);
-		__m512 x4 = _mm512_load_ps(activation_p4 + i);
-		__m512 x5 = _mm512_load_ps(activation_p5 + i);
-		__m512 x6 = _mm512_load_ps(activation_p6 + i);
-		__m512 x7 = _mm512_load_ps(activation_p7 + i);
+		__m512 x0 = _mm512_load_ps(activation + 0 * activation_stride_f + i);
+		__m512 x1 = _mm512_load_ps(activation + 1 * activation_stride_f + i);
+		__m512 x2 = _mm512_load_ps(activation + 2 * activation_stride_f + i);
+		__m512 x3 = _mm512_load_ps(activation + 3 * activation_stride_f + i);
+		__m512 x4 = _mm512_load_ps(activation + 4 * activation_stride_f + i);
+		__m512 x5 = _mm512_load_ps(activation + 5 * activation_stride_f + i);
+		__m512 x6 = _mm512_load_ps(activation + 6 * activation_stride_f + i);
+		__m512 x7 = _mm512_load_ps(activation + 7 * activation_stride_f + i);
 
 		__m512 accum0a = _mm512_fmadd_ps(n0_c0, x0, bias0);
 		__m512 accum1a = _mm512_fmadd_ps(n1_c0, x0, bias1);
@@ -363,7 +348,7 @@ inline FORCE_INLINE void prescreener_old_layer2_avx512(const float kernel[4][8],
 		accum1a = _mm512_add_ps(accum1a, accum1b);
 
 		accum0a = _mm512_max_ps(accum0a, accum1a);
-		_mm512_store_ps(activation_p8 + i, accum0a);
+		_mm512_store_ps(activation + 8 * activation_stride_f + i, accum0a);
 	}
 
 	// Evaluate and collapse neurons 2 and 3
@@ -388,15 +373,16 @@ inline FORCE_INLINE void prescreener_old_layer2_avx512(const float kernel[4][8],
 	bias0 = _mm512_set1_ps(bias[2]);
 	bias1 = _mm512_set1_ps(bias[3]);
 
+	// Evaluate 2x8 convolution.
 	for (unsigned i = 0; i < n; i += 16) {
-		__m512 x0 = _mm512_load_ps(activation_p0 + i);
-		__m512 x1 = _mm512_load_ps(activation_p1 + i);
-		__m512 x2 = _mm512_load_ps(activation_p2 + i);
-		__m512 x3 = _mm512_load_ps(activation_p3 + i);
-		__m512 x4 = _mm512_load_ps(activation_p4 + i);
-		__m512 x5 = _mm512_load_ps(activation_p5 + i);
-		__m512 x6 = _mm512_load_ps(activation_p6 + i);
-		__m512 x7 = _mm512_load_ps(activation_p7 + i);
+		__m512 x0 = _mm512_load_ps(activation + 0 * activation_stride_f + i);
+		__m512 x1 = _mm512_load_ps(activation + 1 * activation_stride_f + i);
+		__m512 x2 = _mm512_load_ps(activation + 2 * activation_stride_f + i);
+		__m512 x3 = _mm512_load_ps(activation + 3 * activation_stride_f + i);
+		__m512 x4 = _mm512_load_ps(activation + 4 * activation_stride_f + i);
+		__m512 x5 = _mm512_load_ps(activation + 5 * activation_stride_f + i);
+		__m512 x6 = _mm512_load_ps(activation + 6 * activation_stride_f + i);
+		__m512 x7 = _mm512_load_ps(activation + 7 * activation_stride_f + i);
 
 		__m512 accum0a = _mm512_fmadd_ps(n0_c0, x0, bias0);
 		__m512 accum1a = _mm512_fmadd_ps(n1_c0, x0, bias1);
@@ -426,7 +412,7 @@ inline FORCE_INLINE void prescreener_old_layer2_avx512(const float kernel[4][8],
 
 		accum0a = _mm512_max_ps(accum0a, accum1a);
 
-		__m512 activation89 = _mm512_load_ps(activation_p8 + i);
+		__m512 activation89 = _mm512_load_ps(activation + 8 * activation_stride_f + i);
 		__m512 debug = _mm512_sub_ps(activation89, accum0a);
 		__mmask16 result = _mm512_cmp_ps_mask(accum0a, activation89, _CMP_LE_OQ);
 
@@ -434,6 +420,7 @@ inline FORCE_INLINE void prescreener_old_layer2_avx512(const float kernel[4][8],
 		_mm_store_si128((__m128i *)(prescreen + i), prescreen_mask);
 	}
 }
+
 
 class PrescreenerOldAVX512F final : public Prescreener {
 	PrescreenerOldCoefficients m_data;
