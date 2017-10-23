@@ -54,6 +54,9 @@
     <ClInclude Include="..\..\znedi3\x86\kernel_sse_commmon.h">
       <Filter>Header Files\x86</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\znedi3\x86\kernel_avx_common.h">
+      <Filter>Header Files\x86</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\znedi3\kernel.cpp">
@@ -84,6 +87,12 @@
       <Filter>Source Files\x86</Filter>
     </ClCompile>
     <ClCompile Include="..\..\znedi3\x86\kernel_sse2.cpp">
+      <Filter>Source Files\x86</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\znedi3\x86\kernel_avx.cpp">
+      <Filter>Source Files\x86</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\znedi3\x86\kernel_avx2.cpp">
       <Filter>Source Files\x86</Filter>
     </ClCompile>
   </ItemGroup>

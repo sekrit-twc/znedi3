@@ -66,6 +66,12 @@ std::unique_ptr<Predictor> create_predictor_sse(const PredictorModel &model, boo
 // SSE2
 std::unique_ptr<Predictor> create_predictor_sse2(const PredictorModel &model, bool use_q2);
 
+// AVX
+std::unique_ptr<Predictor> create_predictor_avx(const PredictorModel &model, bool use_q2);
+
+// AVX2
+std::unique_ptr<Predictor> create_predictor_avx2(const PredictorModel &model, bool use_q2);
+
 // AVX-512F
 void byte_to_float_avx512f(const void *src, void *dst, size_t n);
 void word_to_float_avx512f(const void *src, void *dst, size_t n);

@@ -173,6 +173,10 @@ std::unique_ptr<Predictor> create_predictor_x86(const PredictorModel &model, boo
 		if (!ret && cpu == CPUClass::AUTO_64B && caps.avx512f)
 			ret = create_predictor_avx512f(model, use_q2);
 #endif
+		if (!ret && caps.avx && caps.fma)
+			ret = create_predictor_avx2(model, use_q2);
+		if (!ret && caps.avx)
+			ret = create_predictor_avx(model, use_q2);
 		if (!ret && caps.sse2)
 			ret = create_predictor_sse2(model, use_q2);
 		if (!ret && caps.sse)
@@ -182,6 +186,10 @@ std::unique_ptr<Predictor> create_predictor_x86(const PredictorModel &model, boo
 		if (!ret && cpu >= CPUClass::X86_AVX512)
 			ret = create_predictor_avx512f(model, use_q2);
 #endif
+		if (!ret && cpu >= CPUClass::X86_AVX2)
+			ret = create_predictor_avx2(model, use_q2);
+		if (!ret && cpu >= CPUClass::X86_AVX)
+			ret = create_predictor_avx(model, use_q2);
 		if (!ret && cpu >= CPUClass::X86_SSE2)
 			ret = create_predictor_sse2(model, use_q2);
 		if (!ret && cpu >= CPUClass::X86_SSE)
