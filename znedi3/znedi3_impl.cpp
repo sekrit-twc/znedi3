@@ -186,6 +186,10 @@ void znedi3_filter::process(unsigned width, unsigned height, const void *src, pt
 	assert(static_cast<uintmax_t>(width) < static_cast<uintmax_t>(PTRDIFF_MAX));
 	assert(static_cast<uintmax_t>(height) < static_cast<uintmax_t>(PTRDIFF_MAX));
 
+	assert(reinterpret_cast<uintptr_t>(src) % ALIGNMENT_RELAXED == 0);
+	assert(reinterpret_cast<uintptr_t>(dst) % ALIGNMENT_RELAXED == 0);
+	assert(reinterpret_cast<uintptr_t>(tmp) % ALIGNMENT_RELAXED == 0);
+
 	LinearAllocator alloc{ tmp };
 
 	ptrdiff_t width_d = width;
