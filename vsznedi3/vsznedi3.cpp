@@ -181,8 +181,10 @@ public:
 
 		unsigned src_parity = get_src_parity(src_frame, get_src_frameno(n));
 
-		void *tmp = nullptr;
+		const VSFormat *tmp_format = core.format_preset(pfGray8);
+		VideoFrame tmp_buffer;
 		size_t tmp_size_cur = 0;
+		void *tmp = nullptr;
 
 		for (unsigned p = 0; p < 3; ++p) {
 			if (!m_planes[p])
@@ -209,10 +211,9 @@ public:
 
 			size_t tmp_size = znedi3_filter_get_tmp_size(m_nnedi3.get(), width, height);
 			if (tmp_size > tmp_size_cur) {
-				vs_aligned_free(tmp);
-				if (!(tmp = vs_aligned_malloc(tmp_size, 64)))
-					throw std::bad_alloc{};
+				tmp_buffer = core.new_video_frame(*tmp_format, static_cast<int>(tmp_size), 1);
 				tmp_size_cur = tmp_size;
+				tmp = tmp_buffer.write_ptr(0);
 			}
 
 			znedi3_filter_process(m_nnedi3.get(), width, height, src_field_p, src_field_stride, dst_field_p, dst_field_stride, tmp, !src_parity);
@@ -220,8 +221,6 @@ public:
 			uint8_t *dst_other_field_p = dst_p + static_cast<int>(src_parity) * dst_stride;
 			vs_bitblt(dst_other_field_p, dst_field_stride, src_field_p, src_field_stride, rowsize, height);
 		}
-
-		vs_aligned_free(tmp);
 
 		PropertyMapRef dst_props = dst_frame.frame_props();
 		dst_props.set_prop("_FieldBased", 0, paReplace);
