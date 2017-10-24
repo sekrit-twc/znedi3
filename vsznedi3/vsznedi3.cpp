@@ -26,6 +26,36 @@ enum class FieldOperation {
 	BOB_TOP_FIRST = 3,
 };
 
+void override_cpu_type(znedi3_cpu_type_e &dst, const std::string &str)
+{
+#if defined(__i386) || defined(_M_IX86) || defined(_M_X64) || defined(__x86_64__)
+	if (str == "mmx")
+		dst = ZNEDI3_CPU_X86_MMX;
+	else if (str == "sse")
+		dst = ZNEDI3_CPU_X86_SSE;
+	else if (str == "sse2")
+		dst = ZNEDI3_CPU_X86_SSE2;
+	else if (str == "sse3")
+		dst = ZNEDI3_CPU_X86_SSE3;
+	else if (str == "ssse3")
+		dst = ZNEDI3_CPU_X86_SSSE3;
+	else if (str == "sse41")
+		dst = ZNEDI3_CPU_X86_SSE41;
+	else if (str == "sse42")
+		dst = ZNEDI3_CPU_X86_SSE42;
+	else if (str == "avx")
+		dst = ZNEDI3_CPU_X86_AVX;
+	else if (str == "f16c")
+		dst = ZNEDI3_CPU_X86_F16C;
+	else if (str == "avx2")
+		dst = ZNEDI3_CPU_X86_AVX2;
+	else if (str == "avx512f")
+		dst = ZNEDI3_CPU_X86_AVX512F;
+	else if (str == "avx512_skl")
+		dst = ZNEDI3_CPU_X86_AVX512_SKL;
+#endif
+}
+
 } // namespace
 
 
@@ -83,8 +113,8 @@ public:
 #else
 		weights_path = plugin_path.substr(0, plugin_path.find_last_of('/')) + "/nnedi3_weights.bin";
 #endif
-		if (in.contains("nnedi3_weights_bin"))
-			weights_path = in.get_prop<std::string>("nnedi3_weights_bin");
+		if (in.contains("x_nnedi3_weights_bin"))
+			weights_path = in.get_prop<std::string>("x_nnedi3_weights_bin");
 
 		std::unique_ptr<znedi3_weights, ZNEDI3WeightsFree> nnedi3_weights{ znedi3_weights_from_file(weights_path.c_str()) };
 		if (!nnedi3_weights)
@@ -152,6 +182,9 @@ public:
 			nnedi3_params.int16_prescreen = in.get_prop<bool>("int16_prescreener");
 		if (in.contains("int16_predictor"))
 			nnedi3_params.int16_predict = in.get_prop<bool>("int16_predictor");
+
+		if (in.contains("x_cpu"))
+			override_cpu_type(nnedi3_params.cpu, in.get_prop<std::string>("x_cpu"));
 
 		propagate_if_set(nnedi3_params.slow_exp, in.get_prop<int>("exp", map::default_val(-1)));
 		propagate_if_set(nnedi3_params.show_mask, in.get_prop<int>("show_mask", map::default_val(-1)));
@@ -248,7 +281,8 @@ const PluginInfo g_plugin_info{
 			"int16_predictor:int:opt;"
 			"exp:int:opt;"
 			"show_mask:int:opt;"
-			"nnedi3_weights_bin:data:opt;"
+			"x_nnedi3_weights_bin:data:opt;"
+			"x_cpu:data:opt;"
 		}
 	}
 };
