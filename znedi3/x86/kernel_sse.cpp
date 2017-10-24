@@ -118,7 +118,7 @@ public:
 		// Adjust source pointer to point to top-left of filter window.
 		const float *window = src_p - 2 * src_stride_f - 5;
 
-		for (ptrdiff_t j = 0; j < n; ++j) {
+		for (ptrdiff_t j = 0; j < static_cast<ptrdiff_t>(n); ++j) {
 			__m128 accum0 = _mm_setzero_ps();
 			__m128 accum1 = _mm_setzero_ps();
 			__m128 accum2 = _mm_setzero_ps();
@@ -240,7 +240,7 @@ public:
 		// Adjust source pointer to point to top-left of filter window.
 		const float *window = src_p - 2 * src_stride_f - 6;
 
-		for (ptrdiff_t j = 0; j < n; j += 4) {
+		for (ptrdiff_t j = 0; j < static_cast<ptrdiff_t>(n); j += 4) {
 			__m128 accum0 = _mm_setzero_ps();
 			__m128 accum1 = _mm_setzero_ps();
 			__m128 accum2 = _mm_setzero_ps();
@@ -309,8 +309,8 @@ inline FORCE_INLINE void gather_input_sse(const float *src, ptrdiff_t src_stride
 	double sum = 0;
 	double sum_sq = 0;
 
-	for (unsigned i = 0; i < ydim; ++i) {
-		for (unsigned j = 0; j < xdim; ++j) {
+	for (ptrdiff_t i = 0; i < ydim; ++i) {
+		for (ptrdiff_t j = 0; j < xdim; ++j) {
 			float val = src[i * src_stride_f + j];
 
 			buf[i * xdim + j] = val;

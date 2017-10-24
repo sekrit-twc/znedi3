@@ -39,26 +39,26 @@ inline FORCE_INLINE __m128 mm_rcp24_ps(__m128 x)
 
 inline FORCE_INLINE void sgemv_sse(const float *matrix, const float *vector, const float *bias, unsigned matrix_rows, unsigned matrix_cols, float scale, float *result)
 {
-	for (ptrdiff_t i = 0; i < matrix_rows; i += 16) {
+	for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(matrix_rows); i += 16) {
 		__m128 accum0 = _mm_setzero_ps();
 		__m128 accum1 = _mm_setzero_ps();
 		__m128 accum2 = _mm_setzero_ps();
 		__m128 accum3 = _mm_setzero_ps();
 
-		for (ptrdiff_t j = 0; j < matrix_cols; ++j) {
+		for (ptrdiff_t j = 0; j < static_cast<ptrdiff_t>(matrix_cols); ++j) {
 			__m128 x = _mm_set_ps1(vector[j]);
 			__m128 coeffs;
 
-			coeffs = _mm_load_ps(matrix + j * matrix_rows + i + 0);
+			coeffs = _mm_load_ps(matrix + j * static_cast<ptrdiff_t>(matrix_rows) + i + 0);
 			accum0 = _mm_add_ps(accum0, _mm_mul_ps(coeffs, x));
 
-			coeffs = _mm_load_ps(matrix + j * matrix_rows + i + 4);
+			coeffs = _mm_load_ps(matrix + j * static_cast<ptrdiff_t>(matrix_rows) + i + 4);
 			accum1 = _mm_add_ps(accum1, _mm_mul_ps(coeffs, x));
 
-			coeffs = _mm_load_ps(matrix + j * matrix_rows + i + 8);
+			coeffs = _mm_load_ps(matrix + j * static_cast<ptrdiff_t>(matrix_rows) + i + 8);
 			accum2 = _mm_add_ps(accum2, _mm_mul_ps(coeffs, x));
 
-			coeffs = _mm_load_ps(matrix + j * matrix_rows + i + 12);
+			coeffs = _mm_load_ps(matrix + j * static_cast<ptrdiff_t>(matrix_rows) + i + 12);
 			accum3 = _mm_add_ps(accum3, _mm_mul_ps(coeffs, x));
 		}
 

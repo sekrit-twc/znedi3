@@ -496,7 +496,7 @@ public:
 		const __m512 l0_c32 = _mm512_load_ps(m_data[0].kernel_l0[3] + 32);
 		const __m512 l0_c33 = _mm512_load_ps(m_data[0].kernel_l0[3] + 48);
 
-		for (ptrdiff_t j = 0; j < n; j += 16) {
+		for (ptrdiff_t j = 0; j < static_cast<ptrdiff_t>(n); j += 16) {
 			// Layer 1.
 			__m512 x0, x1, x2, x3;
 			__m512 partial0, partial1, partial2, partial3;
@@ -769,11 +769,11 @@ inline FORCE_INLINE void sgemv_x4_avx512(const float *matrix, const float *vecto
 		__m512 accum2d = _mm512_setzero_ps();
 		__m512 accum3d = _mm512_setzero_ps();
 
-		for (ptrdiff_t j = 0; j < matrix_cols; ++j) {
-			__m512 x0 = _mm512_set1_ps(vector[0 * matrix_cols + j]);
-			__m512 x1 = _mm512_set1_ps(vector[1 * matrix_cols + j]);
-			__m512 x2 = _mm512_set1_ps(vector[2 * matrix_cols + j]);
-			__m512 x3 = _mm512_set1_ps(vector[3 * matrix_cols + j]);
+		for (ptrdiff_t j = 0; j < static_cast<ptrdiff_t>(matrix_cols); ++j) {
+			__m512 x0 = _mm512_set1_ps(vector[0 * static_cast<ptrdiff_t>(matrix_cols) + j]);
+			__m512 x1 = _mm512_set1_ps(vector[1 * static_cast<ptrdiff_t>(matrix_cols) + j]);
+			__m512 x2 = _mm512_set1_ps(vector[2 * static_cast<ptrdiff_t>(matrix_cols) + j]);
+			__m512 x3 = _mm512_set1_ps(vector[3 * static_cast<ptrdiff_t>(matrix_cols) + j]);
 			__m512 coeffs;
 
 			coeffs = _mm512_load_ps(matrix + j * matrix_rows + i + 0);

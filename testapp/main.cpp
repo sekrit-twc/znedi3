@@ -40,7 +40,7 @@ void bitmap_to_planar(const WindowsBitmap &bmp, PlanarImage &planar)
 		planar.height[p] = height;
 	}
 
-	for (ptrdiff_t i = 0; i < height; ++i) {
+	for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(height); ++i) {
 		const unsigned char *src_p = bmp.read_ptr() + i * bmp.stride();
 		unsigned step = bmp.bit_count() / 8;
 

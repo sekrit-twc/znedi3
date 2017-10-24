@@ -65,8 +65,8 @@ inline FORCE_INLINE void gather_input_sse2(const float *src, ptrdiff_t src_strid
 	__m128d sumsq0 = _mm_setzero_pd();
 	__m128d sumsq1 = _mm_setzero_pd();
 
-	for (unsigned i = 0; i < ydim; ++i) {
-		for (unsigned j = 0; j < xdim; j += 4) {
+	for (ptrdiff_t i = 0; i < ydim; ++i) {
+		for (ptrdiff_t j = 0; j < xdim; j += 4) {
 			__m128 val = _mm_loadu_ps(src + j);
 			__m128d vald0 = _mm_cvtps_pd(val);
 			__m128d vald1 = _mm_cvtps_pd(_mm_shuffle_ps(val, val, _MM_SHUFFLE(1, 0, 3, 2)));

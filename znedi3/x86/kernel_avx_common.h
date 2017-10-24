@@ -384,7 +384,7 @@ public:
 		// Adjust source pointer to point to top-left of filter window.
 		const float *window = src_p - 2 * src_stride_f - 6;
 
-		for (ptrdiff_t j = 0; j < n; j += 8) {
+		for (ptrdiff_t j = 0; j < static_cast<ptrdiff_t>(n); j += 8) {
 			// Layer 1.
 			__m256 x0a, x1a, x2a, x3a;
 			__m256 x0b, x1b, x2b, x3b;
@@ -639,11 +639,11 @@ inline FORCE_INLINE void sgemv_x4_avx(const float *matrix, const float *vector, 
 		__m256 accum2b = _mm256_setzero_ps();
 		__m256 accum3b = _mm256_setzero_ps();
 
-		for (ptrdiff_t j = 0; j < matrix_cols; ++j) {
-			__m256 x0 = _mm256_broadcast_ss(vector + 0 * matrix_cols + j);
-			__m256 x1 = _mm256_broadcast_ss(vector + 1 * matrix_cols + j);
-			__m256 x2 = _mm256_broadcast_ss(vector + 2 * matrix_cols + j);
-			__m256 x3 = _mm256_broadcast_ss(vector + 3 * matrix_cols + j);
+		for (ptrdiff_t j = 0; j < static_cast<ptrdiff_t>(matrix_cols); ++j) {
+			__m256 x0 = _mm256_broadcast_ss(vector + 0 * static_cast<ptrdiff_t>(matrix_cols) + j);
+			__m256 x1 = _mm256_broadcast_ss(vector + 1 * static_cast<ptrdiff_t>(matrix_cols) + j);
+			__m256 x2 = _mm256_broadcast_ss(vector + 2 * static_cast<ptrdiff_t>(matrix_cols) + j);
+			__m256 x3 = _mm256_broadcast_ss(vector + 3 * static_cast<ptrdiff_t>(matrix_cols) + j);
 			__m256 coeffs;
 
 			coeffs = _mm256_load_ps(matrix + j * matrix_rows + i + 0);
