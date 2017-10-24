@@ -234,7 +234,7 @@ std::unique_ptr<Prescreener> create_prescreener_new_x86(const PrescreenerNewCoef
 			ret = create_prescreener_new_avx2(coeffs, pixel_half);
 		if (!ret && cpu >= CPUClass::X86_AVX)
 			ret = create_prescreener_new_avx(coeffs, pixel_half);
-		if (!ret && caps.sse)
+		if (!ret && cpu >= CPUClass::X86_SSE)
 			ret = create_prescreener_new_sse(coeffs, pixel_half);
 	}
 
