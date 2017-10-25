@@ -217,7 +217,7 @@ void word_to_float_sse2(const void *src, void *dst, size_t n)
 		__m128i hi = _mm_unpackhi_epi16(tmp, _mm_setzero_si128());
 
 		_mm_store_ps(dst_p + i + 0, _mm_cvtepi32_ps(lo));
-		_mm_store_ps(dst_p + i + 8, _mm_cvtepi32_ps(lo));
+		_mm_store_ps(dst_p + i + 4, _mm_cvtepi32_ps(hi));
 	}
 	for (size_t i = n - n % 8; i < n; ++i) {
 		dst_p[i] = src_p[i];
@@ -254,12 +254,12 @@ void float_to_word_sse2(const void *src, void *dst, size_t n)
 
 	for (size_t i = 0; i < n - n % 8; i += 8) {
 		__m128i lo = _mm_cvtps_epi32(_mm_load_ps(src_p + i + 0));
-		__m128i hi = _mm_cvtps_epi32(_mm_load_ps(src_p + i + 8));
+		__m128i hi = _mm_cvtps_epi32(_mm_load_ps(src_p + i + 4));
 
 		lo = _mm_add_epi32(lo, _mm_set1_epi32(INT16_MIN));
 		hi = _mm_add_epi32(hi, _mm_set1_epi32(INT16_MIN));
 
-		__m128i x = _mm_packus_epi16(lo, hi);
+		__m128i x = _mm_packs_epi32(lo, hi);
 		x = _mm_sub_epi16(x, _mm_set1_epi16(INT16_MIN));
 
 		_mm_store_si128((__m128i *)(dst_p + i), x);

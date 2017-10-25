@@ -19,7 +19,7 @@ void byte_to_float_avx2(const void *src, void *dst, size_t n)
 		__m256i x = _mm256_cvtepu8_epi32(_mm_loadl_epi64((const __m128i *)(src_p + i)));
 		_mm256_store_ps(dst_p + i, _mm256_cvtepi32_ps(x));
 	}
-	for (size_t i = n - (n % 8); i < n; ++i) {
+	for (size_t i = n - n % 8; i < n; ++i) {
 		dst_p[i] = src_p[i];
 	}
 }
@@ -30,10 +30,10 @@ void word_to_float_avx2(const void *src, void *dst, size_t n)
 	float *dst_p = static_cast<float *>(dst);
 
 	for (size_t i = 0; i < n - n % 8; i += 8) {
-		__m256i x = _mm256_cvtepu8_epi32(_mm_loadl_epi64((const __m128i *)(src_p + i)));
+		__m256i x = _mm256_cvtepu16_epi32(_mm_load_si128((const __m128i *)(src_p + i)));
 		_mm256_store_ps(dst_p + i, _mm256_cvtepi32_ps(x));
 	}
-	for (size_t i = n - (n % 8); i < n; ++i) {
+	for (size_t i = n - n % 8; i < n; ++i) {
 		dst_p[i] = src_p[i];
 	}
 }
@@ -51,7 +51,7 @@ void float_to_byte_avx2(const void *src, void *dst, size_t n)
 		x = _mm256_permute4x64_epi64(x, _MM_SHUFFLE(3, 1, 2, 0));
 		_mm_store_si128((__m128i *)(dst_p + i), _mm256_castsi256_si128(x));
 	}
-	for (size_t i = n - (n % 16); i < n; ++i) {
+	for (size_t i = n - n % 16; i < n; ++i) {
 		int32_t x = _mm_cvtss_si32(_mm_set_ss(src_p[i]));
 		x = std::min(std::max(x, static_cast<int32_t>(0)), static_cast<int32_t>(UINT8_MAX));
 		dst_p[i] = static_cast<uint8_t>(x);
@@ -68,9 +68,9 @@ void float_to_word_avx2(const void *src, void *dst, size_t n)
 		__m256i hi = _mm256_cvtps_epi32(_mm256_load_ps(src_p + i + 8));
 		__m256i x = _mm256_packus_epi32(lo, hi);
 		x = _mm256_permute4x64_epi64(x, _MM_SHUFFLE(3, 1, 2, 0));
-		_mm_store_si128((__m128i *)(dst_p + i), _mm256_castsi256_si128(x));
+		_mm256_store_si256((__m256i *)(dst_p + i), x);
 	}
-	for (size_t i = n - (n % 8); i < n; ++i) {
+	for (size_t i = n - n % 8; i < n; ++i) {
 		int32_t x = _mm_cvtss_si32(_mm_set_ss(src_p[i]));
 		x = std::min(std::max(x, static_cast<int32_t>(0)), static_cast<int32_t>(UINT16_MAX));
 		dst_p[i] = static_cast<uint8_t>(x);
