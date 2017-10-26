@@ -4,7 +4,7 @@
 #include <cfloat>
 #include <cmath>
 #include <cstdint>
-#include <limits>
+#include <climits>
 #include <memory>
 #include "kernel.h"
 #include "weights.h"

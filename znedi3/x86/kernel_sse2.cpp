@@ -4,6 +4,7 @@
 #include <cstdint>
 #include <memory>
 #include <emmintrin.h>
+#include <cfloat>
 #include "kernel.h"
 #include "kernel_x86.h"
 
