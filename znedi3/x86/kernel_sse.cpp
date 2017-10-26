@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <memory>
 #include <xmmintrin.h>
+#include <climits>
 #include "alloc.h"
 #include "ccdep.h"
 #include "kernel.h"
