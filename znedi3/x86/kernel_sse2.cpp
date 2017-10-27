@@ -1,6 +1,7 @@
 #ifdef ZNEDI3_X86
 
 #include <algorithm>
+#include <cfloat>
 #include <cstdint>
 #include <memory>
 #include <emmintrin.h>

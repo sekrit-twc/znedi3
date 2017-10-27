@@ -2,6 +2,7 @@
 
 #include <algorithm>
 #include <cfloat>
+#include <climits>
 #include <cstdint>
 #include <memory>
 #include <xmmintrin.h>

@@ -2,6 +2,7 @@
 #include <array>
 #include <cassert>
 #include <cfloat>
+#include <climits>
 #include <cmath>
 #include <cstdint>
 #include <limits>

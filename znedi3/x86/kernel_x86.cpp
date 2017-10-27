@@ -1,5 +1,6 @@
 #ifdef ZNEDI3_X86
 
+#include <algorithm>
 #include <cassert>
 #include "alloc.h"
 #include "cpuinfo.h"
