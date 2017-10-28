@@ -217,7 +217,7 @@ public:
 		ConstVideoFrame src_frame = m_clip.get_frame_filter(get_src_frameno(n), frame_ctx);
 		VideoFrame dst_frame = core.new_video_frame(src_frame.format(), src_frame.width(0), src_frame.height(0) * (m_dh ? 2 : 1), src_frame);
 
-		unsigned src_parity = get_src_parity(src_frame, get_src_frameno(n));
+		unsigned src_parity = get_src_parity(src_frame, n);
 
 		std::pair<size_t, VideoFrame> tmp_buffer{};
 		void *tmp = nullptr;
