@@ -1,4 +1,4 @@
 Based on work by:
 	dubhater
+	Kevin Stone
 	Loren Merritt
-	tritical
