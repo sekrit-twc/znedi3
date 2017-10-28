@@ -1,7 +1,10 @@
 #include <algorithm>
 #include <cstdint>
 #include <memory>
+#include <mutex>
 #include <stdexcept>
+#include <utility>
+#include <vector>
 #include <znedi3.h>
 #include "vsxx_pluginmain.h"
 
@@ -61,6 +64,8 @@ void override_cpu_type(znedi3_cpu_type_e &dst, const std::string &str)
 
 class VSZNEDI3 : public vsxx::FilterBase {
 	std::unique_ptr<znedi3_filter, ZNEDI3FilterFree> m_nnedi3;
+	std::vector<std::pair<size_t, VideoFrame>> m_cache;
+	std::mutex m_cache_mutex;
 	FilterNode m_clip;
 	VSVideoInfo m_vi;
 	FieldOperation m_mode;
@@ -214,9 +219,7 @@ public:
 
 		unsigned src_parity = get_src_parity(src_frame, get_src_frameno(n));
 
-		const VSFormat *tmp_format = core.format_preset(pfGray8);
-		VideoFrame tmp_buffer;
-		size_t tmp_size_cur = 0;
+		std::pair<size_t, VideoFrame> tmp_buffer{};
 		void *tmp = nullptr;
 
 		for (unsigned p = 0; p < 3; ++p) {
@@ -243,16 +246,36 @@ public:
 			int dst_field_stride = dst_stride * 2;
 
 			size_t tmp_size = znedi3_filter_get_tmp_size(m_nnedi3.get(), width, height);
-			if (tmp_size > tmp_size_cur) {
-				tmp_buffer = core.new_video_frame(*tmp_format, static_cast<int>(tmp_size), 1);
-				tmp_size_cur = tmp_size;
-				tmp = tmp_buffer.write_ptr(0);
+			if (tmp_size > tmp_buffer.first) {
+				std::pair<size_t, VideoFrame> buffer{};
+
+				{
+					std::lock_guard<std::mutex> lock{ m_cache_mutex };
+
+					if (!m_cache.empty()) {
+						buffer = std::move(m_cache.back());
+						m_cache.pop_back();
+					}
+				}
+
+				if (buffer.first < tmp_size) {
+					buffer.first = tmp_size;
+					buffer.second = core.new_video_frame(*core.format_preset(pfGray8), tmp_size, 1);
+				}
+
+				tmp_buffer = std::move(buffer);
+				tmp = tmp_buffer.second.write_ptr(0);
 			}
 
 			znedi3_filter_process(m_nnedi3.get(), width, height, src_field_p, src_field_stride, dst_field_p, dst_field_stride, tmp, !src_parity);
 
 			uint8_t *dst_other_field_p = dst_p + static_cast<int>(src_parity) * dst_stride;
 			vs_bitblt(dst_other_field_p, dst_field_stride, src_field_p, src_field_stride, rowsize, height);
+		}
+
+		if (tmp_buffer.first) {
+			std::lock_guard<std::mutex> lock{ m_cache_mutex };
+			m_cache.emplace_back(std::move(tmp_buffer));
 		}
 
 		PropertyMapRef dst_props = dst_frame.frame_props();
