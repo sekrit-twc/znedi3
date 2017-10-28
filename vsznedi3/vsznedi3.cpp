@@ -147,8 +147,12 @@ public:
 
 		if (in.contains("planes")) {
 			size_t n = in.num_elements("planes");
-			for (size_t i = 0; i < std::min(n, static_cast<size_t>(3)); ++i) {
-				m_planes[i] = in.get_prop<bool>("planes", static_cast<int>(i));
+			std::fill_n(m_planes, 3, false);
+
+			for (size_t i = 0; i < n; ++i) {
+				unsigned p = in.get_prop<unsigned>("planes", static_cast<int>(i));
+				if (p < 3)
+					m_planes[p] = true;
 			}
 		}
 
