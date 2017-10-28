@@ -70,10 +70,10 @@ void float_to_word_avx2(const void *src, void *dst, size_t n)
 		x = _mm256_permute4x64_epi64(x, _MM_SHUFFLE(3, 1, 2, 0));
 		_mm256_store_si256((__m256i *)(dst_p + i), x);
 	}
-	for (size_t i = n - n % 8; i < n; ++i) {
+	for (size_t i = n - n % 16; i < n; ++i) {
 		int32_t x = _mm_cvtss_si32(_mm_set_ss(src_p[i]));
 		x = std::min(std::max(x, static_cast<int32_t>(0)), static_cast<int32_t>(UINT16_MAX));
-		dst_p[i] = static_cast<uint8_t>(x);
+		dst_p[i] = static_cast<uint16_t>(x);
 	}
 }
 

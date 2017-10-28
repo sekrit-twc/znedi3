@@ -268,7 +268,7 @@ void float_to_word_sse2(const void *src, void *dst, size_t n)
 	for (size_t i = n - n % 8; i < n; ++i) {
 		int32_t x = _mm_cvtss_si32(_mm_set_ss(src_p[i]));
 		x = std::min(std::max(x, static_cast<int32_t>(0)), static_cast<int32_t>(UINT16_MAX));
-		dst_p[i] = static_cast<uint8_t>(x);
+		dst_p[i] = static_cast<uint16_t>(x);
 	}
 }
 
