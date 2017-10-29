@@ -146,9 +146,9 @@ inline FORCE_INLINE void prescreener_old_layer0_avx512(const float kernel[4][48]
 				__m512 x0 = _mm512_loadu_ps(window_p + i + kk);
 				__m512 x4 = _mm512_loadu_ps(window_p + i + kk + 4);
 
-				__m512 x1 = _mm512_castsi512_ps(_mm512_alignr_epi8(_mm512_castps_si512(x4), _mm512_castps_si512(x0), 4));
-				__m512 x2 = _mm512_castsi512_ps(_mm512_alignr_epi8(_mm512_castps_si512(x4), _mm512_castps_si512(x0), 8));
-				__m512 x3 = _mm512_castsi512_ps(_mm512_alignr_epi8(_mm512_castps_si512(x4), _mm512_castps_si512(x0), 12));
+				__m512 x1 = _mm512_castsi512_ps(_mm512_alignr_epi32(_mm512_castps_si512(x4), _mm512_castps_si512(x0), 1));
+				__m512 x2 = _mm512_castsi512_ps(_mm512_alignr_epi32(_mm512_castps_si512(x4), _mm512_castps_si512(x0), 2));
+				__m512 x3 = _mm512_castsi512_ps(_mm512_alignr_epi32(_mm512_castps_si512(x4), _mm512_castps_si512(x0), 3));
 
 				__m512 accum0 = _mm512_load_ps(activation + 0 * activation_stride_f + i);
 				__m512 accum1 = _mm512_load_ps(activation + 1 * activation_stride_f + i);
