@@ -88,9 +88,9 @@ void show_prescreen_mask(const void *src, ptrdiff_t src_stride, void *dst, const
 
 
 znedi3_filter::znedi3_filter(const NNEDI3Weights &weights, const znedi3_filter_params &params) :
+	m_interpolate_func{},
 	m_pixel_load_func{},
 	m_pixel_store_func{},
-	m_interpolate_func{},
 	m_type{ translate_pixel_type(params.pixel_type) },
 	m_cpu{ translate_cpu_type(params.cpu) }
 {
@@ -183,8 +183,10 @@ size_t znedi3_filter::get_tmp_size(unsigned width, unsigned height) const
 
 void znedi3_filter::process(unsigned width, unsigned height, const void *src, ptrdiff_t src_stride, void *dst, ptrdiff_t dst_stride, void *tmp, unsigned parity) const
 {
+#if UINT_MAX >= PTRDIFF_MAX
 	assert(static_cast<uintmax_t>(width) < static_cast<uintmax_t>(PTRDIFF_MAX));
 	assert(static_cast<uintmax_t>(height) < static_cast<uintmax_t>(PTRDIFF_MAX));
+#endif
 
 	assert(reinterpret_cast<uintptr_t>(src) % ALIGNMENT_RELAXED == 0);
 	assert(reinterpret_cast<uintptr_t>(dst) % ALIGNMENT_RELAXED == 0);

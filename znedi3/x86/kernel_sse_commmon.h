@@ -123,8 +123,6 @@ public:
 
 		// Adjust source pointer to point to top-left of filter window.
 		const float *window = src_p - static_cast<ptrdiff_t>(m_model.ydim / 2) * src_stride_f - (m_model.xdim / 2 - 1);
-		unsigned filter_size = m_model.xdim * m_model.ydim;
-		unsigned nns = m_model.nns;
 
 		for (unsigned i = 0; i < n; ++i) {
 			if (prescreen[i])

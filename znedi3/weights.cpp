@@ -147,7 +147,6 @@ std::unique_ptr<NNEDI3Weights> read_nnedi3_weights(const float *data)
 	size_t size = NNEDI3_WEIGHTS_SIZE / sizeof(float);
 
 	auto read = [&](float *dst, size_t n) { assert(n <= size); std::copy_n(data, n, dst); data += n; size -= n; };
-	auto skip = [&](size_t n) { assert(n <= size); data += n; size -= n; };
 
 	// Old prescreener data.
 	{

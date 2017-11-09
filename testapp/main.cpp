@@ -57,8 +57,8 @@ void bitmap_to_planar(const WindowsBitmap &bmp, PlanarImage &planar)
 
 void planar_to_bitmap(const PlanarImage &planar, WindowsBitmap &bmp)
 {
-	assert(bmp.width() == planar.width[0]);
-	assert(bmp.height() == planar.height[0]);
+	assert(static_cast<unsigned>(bmp.width()) == planar.width[0]);
+	assert(static_cast<unsigned>(bmp.height()) == planar.height[0]);
 	assert(planar.width[0] == planar.width[1] && planar.width[0] == planar.width[2]);
 	assert(planar.height[0] == planar.height[1] && planar.height[0] == planar.height[2]);
 

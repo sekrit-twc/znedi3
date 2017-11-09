@@ -49,8 +49,6 @@ inline FORCE_INLINE __m128 mm_expf_ps(__m128 x)
 
 inline FORCE_INLINE __m128 mm_elliott_ps(__m128 x)
 {
-	constexpr uint32_t mask[4] = { UINT32_MAX >> 1, UINT32_MAX >> 1, UINT32_MAX >> 1, UINT32_MAX >> 1 };
-
 	__m128 den = _mm_and_ps(x, _mm_castsi128_ps(_mm_set1_epi32(UINT32_MAX >> 1)));
 	den = _mm_add_ps(den, _mm_set_ps1(1.0f));
 
@@ -110,7 +108,7 @@ inline FORCE_INLINE void gather_input_sse2(const float *src, ptrdiff_t src_strid
 inline FORCE_INLINE void softmax_exp(float *ptr, unsigned n)
 {
 	const uint32_t abs_mask_val = UINT32_MAX >> 1;
-	const __m128 abs_mask = _mm_set_ps1(*(const float *)&abs_mask_val);
+	const __m128 abs_mask = _mm_castsi128_ps(_mm_set1_epi32(abs_mask_val));
 	const __m128 exp_max = _mm_set_ps1(80.0f);
 
 	for (unsigned i = 0; i < n; i += 4) {

@@ -110,9 +110,6 @@ public:
 	{
 		const InterleavedPrescreenerOldCoefficients &data = m_data.front();
 
-		float *activation = static_cast<float *>(tmp);
-		ptrdiff_t activation_stride = 512 * sizeof(float);
-
 		const float *src_p = static_cast<const float *>(src);
 		ptrdiff_t src_stride_f = src_stride / sizeof(float);
 
@@ -337,8 +334,8 @@ inline FORCE_INLINE void gather_input_sse(const float *src, ptrdiff_t src_stride
 
 inline FORCE_INLINE void softmax_exp(float *ptr, unsigned n)
 {
-	const uint32_t abs_mask_val = UINT32_MAX >> 1;
-	const __m128 abs_mask = _mm_set_ps1(*(const float *)&abs_mask_val);
+	alignas(16) const uint32_t abs_mask_val[4] = { UINT32_MAX >> 1, UINT32_MAX >> 1, UINT32_MAX >> 1, UINT32_MAX >> 1 };
+	const __m128 abs_mask = _mm_load_ps((const float *)abs_mask_val);
 	const __m128 exp_max = _mm_set_ps1(80.0f);
 
 	for (unsigned i = 0; i < n; i += 4) {
