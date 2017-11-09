@@ -1,5 +1,6 @@
 #include <cassert>
 #include <cstddef>
+#include <cstring>
 #include <memory>
 #include <iostream>
 #include <stdexcept>
@@ -78,11 +79,11 @@ int arg_decode_cpu(const ArgparseOption *, void *out, const char *param, int)
 {
 	int *cpu = static_cast<int *>(out);
 
-#define ELSE_IF(str, e) else if (!strcmp(param, str)) do { *cpu = e; } while (0)
+#define ELSE_IF(str, e) else if (!std::strcmp(param, str)) do { *cpu = e; } while (0)
 
-	if (!strcmp(param, "none"))
+	if (!std::strcmp(param, "none"))
 		*cpu = ZNEDI3_CPU_NONE;
-	else if (!strcmp(param, "auto"))
+	else if (!std::strcmp(param, "auto"))
 		*cpu = ZNEDI3_CPU_AUTO_64B;
 #if defined(__i386) || defined(_M_IX86) || defined(_M_X64) || defined(__x86_64__)
 	ELSE_IF("mmx", ZNEDI3_CPU_X86_MMX);
