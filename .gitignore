@@ -2,6 +2,7 @@
 *.la
 *.so
 *.o
+testapp/testapp
 
 *.dll
 *.exe
