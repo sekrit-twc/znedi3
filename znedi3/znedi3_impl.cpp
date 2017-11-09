@@ -21,7 +21,7 @@ CPUClass translate_cpu_type(znedi3_cpu_type_e e)
 		return CPUClass::AUTO;
 	case ZNEDI3_CPU_AUTO_64B:
 		return CPUClass::AUTO_64B;
-#if defined(__i386) || defined(_M_IX86) || defined(_M_X64) || defined(__x86_64__)
+#ifdef ZNEDI3_X86
 	case ZNEDI3_CPU_X86_MMX:
 		return CPUClass::NONE;
 	case ZNEDI3_CPU_X86_SSE:
