@@ -11,6 +11,11 @@
 #include "kernel.h"
 #include "kernel_x86.h"
 
+#define mm512_and_ps(a, b) _mm512_castsi512_ps(_mm512_and_si512(_mm512_castps_si512((a)), _mm512_castps_si512((b))))
+#define mm512_andnot_ps(a, b) _mm512_castsi512_ps(_mm512_andnot_si512(_mm512_castps_si512((a)), _mm512_castps_si512((b))))
+#define mm512_or_ps(a, b) _mm512_castsi512_ps(_mm512_or_si512(_mm512_castps_si512((a)), _mm512_castps_si512((b))))
+#define mm512_extractf32x8_ps(a, imm) _mm256_castpd_ps(_mm512_extractf64x4_pd(_mm512_castps_pd((a)), imm))
+
 namespace znedi3 {
 namespace {
 
@@ -80,10 +85,10 @@ inline FORCE_INLINE __m512 mm512_expf_ps(__m512 x)
 	x = _mm512_castsi512_ps(_mm512_cvttps_epi32(x));
 
 	// Clear the mantissa. This represents exp2(floor(x)).
-	i = _mm512_and_ps(x, _mm512_castsi512_ps(_mm512_set1_epi32(0x7F800000UL)));
+	i = mm512_and_ps(x, _mm512_castsi512_ps(_mm512_set1_epi32(0x7F800000UL)));
 	// Reset the exponent to zero. This represents exp2(x - floor(x)).
-	f = _mm512_and_ps(x, _mm512_castsi512_ps(_mm512_set1_epi32(0x007FFFFFUL)));
-	f = _mm512_or_ps(f, _mm512_castsi512_ps(_mm512_set1_epi32(0x3F800000UL)));
+	f = mm512_and_ps(x, _mm512_castsi512_ps(_mm512_set1_epi32(0x007FFFFFUL)));
+	f = mm512_or_ps(f, _mm512_castsi512_ps(_mm512_set1_epi32(0x3F800000UL)));
 
 	x = _mm512_set1_ps(EXP2F_X_PLUS1_REMEZ[4]);
 	x = _mm512_fmadd_ps(f, x, _mm512_set1_ps(EXP2F_X_PLUS1_REMEZ[3]));
@@ -98,12 +103,11 @@ inline FORCE_INLINE __m512 mm512_elliott_ps(__m512 x)
 {
 	const __m512i mask = _mm512_set1_epi32(UINT32_MAX >> 1);
 
-	__m512 den = _mm512_and_ps(x, _mm512_castsi512_ps(mask));
+	__m512 den = mm512_and_ps(x, _mm512_castsi512_ps(mask));
 	den = _mm512_add_ps(den, _mm512_set1_ps(1.0f));
 
 	return _mm512_mul_ps(x, mm512_rcp24_ps(den));
 }
-
 
 inline FORCE_INLINE void prescreener_old_layer0_avx512(const float kernel[4][48], const float bias[4], const float *window, ptrdiff_t src_stride,
                                                        float *activation, ptrdiff_t activation_stride, unsigned n)
@@ -873,10 +877,10 @@ inline FORCE_INLINE void softmax_exp(float *ptr, unsigned n)
 
 	for (unsigned i = 0; i < n; i += 16) {
 		__m512 x = _mm512_load_ps(ptr + i);
-		__m512 xabs = _mm512_and_ps(abs_mask, x);
-		__m512 xsign = _mm512_andnot_ps(abs_mask, x);
+		__m512 xabs = mm512_and_ps(abs_mask, x);
+		__m512 xsign = mm512_andnot_ps(abs_mask, x);
 		x = _mm512_min_ps(xabs, exp_max);
-		x = _mm512_or_ps(xsign, x);
+		x = mm512_or_ps(xsign, x);
 		x = mm512_expf_ps(x);
 		_mm512_store_ps(ptr + i, x);
 	}
@@ -926,7 +930,7 @@ inline FORCE_INLINE void wae5_x4(const float *softmax, const float *elliott, uns
 	vsum2 = _mm512_add_ps(vsum2, vsum3);
 	vsum0 = _mm512_add_ps(vsum0, vsum2);
 
-	__m256 vsum_reduced_256 = _mm256_add_ps(_mm512_castps512_ps256(vsum0), _mm512_extractf32x8_ps(vsum0, 1));
+	__m256 vsum_reduced_256 = _mm256_add_ps(_mm512_castps512_ps256(vsum0), mm512_extractf32x8_ps(vsum0, 1));
 	__m128 vsum_reduced = _mm_add_ps(_mm256_castps256_ps128(vsum_reduced_256), _mm256_extractf128_ps(vsum_reduced_256, 1));
 
 	mm512_transpose4_4x4_ps(wsum0, wsum1, wsum2, wsum3);
@@ -934,7 +938,7 @@ inline FORCE_INLINE void wae5_x4(const float *softmax, const float *elliott, uns
 	wsum2 = _mm512_add_ps(wsum2, wsum3);
 	wsum0 = _mm512_add_ps(wsum0, wsum2);
 
-	__m256 wsum_reduced_256 = _mm256_add_ps(_mm512_castps512_ps256(wsum0), _mm512_extractf32x8_ps(wsum0, 1));
+	__m256 wsum_reduced_256 = _mm256_add_ps(_mm512_castps512_ps256(wsum0), mm512_extractf32x8_ps(wsum0, 1));
 	__m128 wsum_reduced = _mm_add_ps(_mm256_castps256_ps128(wsum_reduced_256), _mm256_extractf128_ps(wsum_reduced_256, 1));
 
 	__m128 mask = _mm_cmp_ps(wsum_reduced, _mm_set_ps1(1e-10f), _CMP_GT_OQ);
