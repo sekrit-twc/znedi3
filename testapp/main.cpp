@@ -33,9 +33,11 @@ void bitmap_to_planar(const WindowsBitmap &bmp, PlanarImage &planar)
 	unsigned width = bmp.width();
 	unsigned height = bmp.height();
 
+	ptrdiff_t stride = width % 64 ? width - width % 64 + 64 : width;
+
 	for (unsigned p = 0; p < 3; ++p) {
-		planar.data[p].resize(width * height);
-		planar.stride[p] = width;
+		planar.data[p].resize(stride * height);
+		planar.stride[p] = stride;
 		planar.width[p] = width;
 		planar.height[p] = height;
 	}
