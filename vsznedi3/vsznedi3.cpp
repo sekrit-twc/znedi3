@@ -226,7 +226,7 @@ public:
 		std::pair<size_t, VideoFrame> tmp_buffer{};
 		void *tmp = nullptr;
 
-		for (unsigned p = 0; p < 3; ++p) {
+		for (int p = 0; p < src_frame.format().numPlanes; ++p) {
 			if (!m_planes[p])
 				continue;
 
