@@ -53,16 +53,16 @@ vsxx_HDRS = \
 	vsxx/vsxx_pluginmain.h
 
 ifeq ($(X86), 1)
-  znedi3/x86/kernel_avx.o: EXTRA_CXXFLAGS := -mavx
-  znedi3/x86/kernel_avx2.o: EXTRA_CXXFLAGS := -mavx2 -mfma
-  znedi3/x86/kernel_f16c.o: EXTRA_CXXFLAGS := -mavx -mf16c
+  znedi3/x86/kernel_avx.o: EXTRA_CXXFLAGS := -mavx -mtune=sandybridge
+  znedi3/x86/kernel_avx2.o: EXTRA_CXXFLAGS := -mavx2 -mfma -mtune=haswell
+  znedi3/x86/kernel_f16c.o: EXTRA_CXXFLAGS := -mavx -mf16c -mtune=ivybridge
   znedi3/x86/kernel_sse.o: EXTRA_CXXFLAGS := -msse
   znedi3/x86/kernel_sse2.o: EXTRA_CXXFLAGS := -msse2
   MY_CPPFLAGS := -DZNEDI3_X86 $(MY_CPPFLAGS)
 endif
 
 ifeq ($(X86_AVX512), 1)
-  znedi3/x86/kernel_avx512.o: EXTRA_CXXFLAGS := -mavx512f -mfma
+  znedi3/x86/kernel_avx512.o: EXTRA_CXXFLAGS := -mavx512f -mfma -mtune=skylake-avx512
   MY_CPPFLAGS := -DZNEDI3_X86_AVX512 $(MY_CPPFLAGS)
 endif
 
