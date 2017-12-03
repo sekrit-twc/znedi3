@@ -134,13 +134,13 @@ pixel_io_func select_pixel_io_func_x86(PixelType in, PixelType out, CPUClass cpu
 #ifdef ZNEDI3_X86_AVX512
 		if (!ret && cpu >= CPUClass::X86_AVX512)
 			ret = select_pixel_io_func_avx512f(in, out);
+#endif
 		if (!ret && cpu >= CPUClass::X86_AVX2)
 			ret = select_pixel_io_func_avx2(in, out);
 		if (!ret && cpu >= CPUClass::X86_F16C)
 			ret = select_pixel_io_func_f16c(in, out);
 		if (!ret && cpu >= CPUClass::X86_SSE2)
 			ret = select_pixel_io_func_sse2(in, out);
-#endif
 	}
 
 	return ret;
@@ -166,13 +166,13 @@ interpolate_func select_interpolate_func_x86(CPUClass cpu)
 #ifdef ZNEDI3_X86_AVX512
 		if (!ret && cpu >= CPUClass::X86_AVX512)
 			ret = cubic_interpolation_avx512f;
+#endif
 		if (!ret && cpu >= CPUClass::X86_AVX2)
 			ret = cubic_interpolation_avx2;
 		if (!ret && cpu >= CPUClass::X86_AVX)
 			ret = cubic_interpolation_avx;
 		if (!ret && cpu >= CPUClass::X86_SSE2)
 			ret = cubic_interpolation_sse2;
-#endif
 	}
 
 	return ret;
