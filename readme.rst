@@ -1,6 +1,8 @@
 Description
 ===========
 
+znedi3 is a CPU-optimized version of nneedi
+
 nnedi3 is an intra-field only deinterlacer. It takes a frame, throws
 away one field, and then interpolates the missing pixels using only
 information from the remaining field. It is also good for enlarging
@@ -19,7 +21,6 @@ The file ``nnedi3_weights.bin`` is required. In Windows, it must be
 located in the same folder as ``libnnedi3.dll``. Everywhere else it
 can be located either in the same folder as
 ``libnnedi3.so``/``libnnedi3.dylib``, or in ``$prefix/share/nnedi3/``.
-The build system installs it at the latter location automatically.
 
 ::
 
@@ -190,19 +191,30 @@ Parameters:
         Default: False.
 
 
-Compilation
-===========
+Compilation(Linux)
+==================
 
+Clone the repository (using the :code:`--recursive` argument to also dowload the required :code:`vsxx` library as a submodule):
 ::
 
-   ./autogen.sh
-   ./configure
-   make
+   git clone --recursive https://github.com/sekrit-twc/znedi3
 
-On x86, yasm is currently not optional.
+Compile the library:
+::
 
-DLLs can be found in the "releases" section.
+   cd znedi3
+   make X86=1
 
+   
+To install, copy :code:`vsznedi3.so` and :code:`nnedi3_weights.bin` to the vapoursynth plugin folder (usually :code:`/usr/lib/x86_64-linux-gnu/vapoursynth/`)
+::
+
+   sudo cp nnedi3_weights.bin vsznedi3.so /usr/lib/x86_64-linux-gnu/vapoursynth/
+
+There is also a test application which can be built to check the efficiency of the plugin kernels optimized for different SIMD instructions:
+::
+
+   make X86=1 testapp/testapp
 
 License
 =======
