@@ -264,7 +264,7 @@ public:
 
 				if (buffer.first < tmp_size) {
 					buffer.first = tmp_size;
-					buffer.second = core.new_video_frame(*core.format_preset(pfGray8), tmp_size, 1);
+					buffer.second = core.new_video_frame(*core.format_preset(pfGray8), static_cast<int>(tmp_size), 1);
 				}
 
 				tmp_buffer = std::move(buffer);
