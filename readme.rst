@@ -1,7 +1,7 @@
 Description
 ===========
 
-znedi3 is a CPU-optimized version of nneedi
+znedi3 is a CPU-optimized version of nnedi.
 
 nnedi3 is an intra-field only deinterlacer. It takes a frame, throws
 away one field, and then interpolates the missing pixels using only
@@ -191,8 +191,8 @@ Parameters:
         Default: False.
 
 
-Compilation(Linux)
-==================
+Compilation (Linux)
+===================
 
 Clone the repository (using the :code:`--recursive` argument to also dowload the required :code:`vsxx` library as a submodule):
 ::
@@ -206,7 +206,7 @@ Compile the library:
    make X86=1
 
    
-To install, copy :code:`vsznedi3.so` and :code:`nnedi3_weights.bin` to the vapoursynth plugin folder (usually :code:`/usr/lib/x86_64-linux-gnu/vapoursynth/`)
+To install, copy :code:`vsznedi3.so` and :code:`nnedi3_weights.bin` to the vapoursynth plugin folder (usually :code:`/usr/lib/x86_64-linux-gnu/vapoursynth/`):
 ::
 
    sudo cp nnedi3_weights.bin vsznedi3.so /usr/lib/x86_64-linux-gnu/vapoursynth/
