@@ -10,7 +10,7 @@ extern "C" {
 typedef enum znedi3_cpu_type_e {
 	ZNEDI3_CPU_NONE     = 0, /**< Portable C-based implementation. */
 	ZNEDI3_CPU_AUTO     = 1, /**< Runtime CPU detection. */
-	ZNEDI3_CPU_AUTO_64B = 2, /**< Allow use of 64-byte (512-bit) instructions. Since API 2.3. */
+	ZNEDI3_CPU_AUTO_64B = 2, /**< Allow use of 64-byte (512-bit) instructions. */
 #if defined(__i386) || defined(_M_IX86) || defined(_M_X64) || defined(__x86_64__)
 	ZNEDI3_CPU_X86_MMX        = 1000,
 	ZNEDI3_CPU_X86_SSE        = 1001,
