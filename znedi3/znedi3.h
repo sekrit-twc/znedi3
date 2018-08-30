@@ -10,9 +10,9 @@ extern "C" {
 typedef enum znedi3_cpu_type_e {
 	ZNEDI3_CPU_NONE     = 0, /**< Portable C-based implementation. */
 	ZNEDI3_CPU_AUTO     = 1, /**< Runtime CPU detection. */
-	ZNEDI3_CPU_AUTO_64B = 2, /**< Allow use of 64-byte (512-bit) instructions. */
+	ZNEDI3_CPU_AUTO_64B = 2  /**< Allow use of 64-byte (512-bit) instructions. */
 #if defined(__i386) || defined(_M_IX86) || defined(_M_X64) || defined(__x86_64__)
-	ZNEDI3_CPU_X86_MMX        = 1000,
+	,ZNEDI3_CPU_X86_MMX       = 1000,
 	ZNEDI3_CPU_X86_SSE        = 1001,
 	ZNEDI3_CPU_X86_SSE2       = 1002,
 	ZNEDI3_CPU_X86_SSE3       = 1003,
@@ -23,7 +23,7 @@ typedef enum znedi3_cpu_type_e {
 	ZNEDI3_CPU_X86_F16C       = 1008, /**< AVX with F16C extension (e.g. Ivy Bridge) */
 	ZNEDI3_CPU_X86_AVX2       = 1009,
 	ZNEDI3_CPU_X86_AVX512F    = 1010,
-	ZNEDI3_CPU_X86_AVX512_SKL = 1011, /**< AVX-512 {F,CD,VL,BW,DQ} (e.g. Skylake-X/SP) */
+	ZNEDI3_CPU_X86_AVX512_SKL = 1011  /**< AVX-512 {F,CD,VL,BW,DQ} (e.g. Skylake-X/SP) */
 #endif
 } znedi3_cpu_type_e;
 
