@@ -20,10 +20,10 @@ typedef enum znedi3_cpu_type_e {
 	ZNEDI3_CPU_X86_SSE41      = 1005,
 	ZNEDI3_CPU_X86_SSE42      = 1006,
 	ZNEDI3_CPU_X86_AVX        = 1007,
-	ZNEDI3_CPU_X86_F16C       = 1008, /**< AVX with F16C extension (e.g. Ivy Bridge) */
+	ZNEDI3_CPU_X86_F16C       = 1008, /**< AVX with F16C extension (e.g. Ivy Bridge). */
 	ZNEDI3_CPU_X86_AVX2       = 1009,
 	ZNEDI3_CPU_X86_AVX512F    = 1010,
-	ZNEDI3_CPU_X86_AVX512_SKL = 1011  /**< AVX-512 {F,CD,VL,BW,DQ} (e.g. Skylake-X/SP) */
+	ZNEDI3_CPU_X86_AVX512_SKL = 1011  /**< AVX-512 {F,CD,VL,BW,DQ} (e.g. Skylake-X/SP). */
 #endif
 } znedi3_cpu_type_e;
 
