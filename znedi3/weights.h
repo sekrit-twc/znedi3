@@ -107,7 +107,7 @@ std::unique_ptr<NNEDI3Weights> read_nnedi3_weights(const float *data);
 inline size_t PredictorTraitsHash::operator()(const PredictorTraits &traits) const noexcept
 {
 #ifdef _MSC_VER
-	return std::_Hash_bytes(reinterpret_cast<const unsigned char *>(&traits), sizeof(PredictorTraits));
+	return std::_Hash_representation(traits);
 #else
 	std::hash<unsigned> h;
 	return h(traits.xdim) * h(traits.ydim) * h(traits.nns);
