@@ -59,20 +59,8 @@
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\znedi3\kernel.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\znedi3\weights.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\znedi3\znedi3.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\znedi3\znedi3_impl.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\znedi3\x86\kernel_x86.cpp">
-      <Filter>Source Files\x86</Filter>
     </ClCompile>
     <ClCompile Include="..\..\znedi3\x86\cpuinfo_x86.cpp">
       <Filter>Source Files\x86</Filter>
@@ -97,6 +85,18 @@
     </ClCompile>
     <ClCompile Include="..\..\znedi3\x86\kernel_f16c.cpp">
       <Filter>Source Files\x86</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\znedi3\znedi3.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\znedi3\x86\kernel_x86.cpp">
+      <Filter>Source Files\x86</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\znedi3\kernel.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\znedi3\znedi3_impl.cpp">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
