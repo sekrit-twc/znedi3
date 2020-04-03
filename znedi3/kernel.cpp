@@ -40,6 +40,11 @@ void float_to_integer(const void *src, void *dst, size_t n)
 	});
 }
 
+void copy_float(const void *src, void *dst, size_t n)
+{
+	std::copy_n(static_cast<const unsigned char *>(src), n * sizeof(float), static_cast<unsigned char *>(dst));
+}
+
 float dot_product(const float *kernel, const float *input, unsigned n, float scale, float bias)
 {
 	float accum = 0.0f;
@@ -321,6 +326,8 @@ pixel_io_func select_pixel_io_func(PixelType in, PixelType out, CPUClass cpu)
 		ret = float_to_integer<uint8_t>;
 	if (!ret && in == PixelType::FLOAT && out == PixelType::WORD)
 		ret = float_to_integer<uint16_t>;
+	if (!ret && in == PixelType::FLOAT && out == PixelType::FLOAT)
+		ret = copy_float;
 
 	return ret;
 }
