@@ -138,6 +138,8 @@ public:
 		m_dh = in.get_prop<bool>("dh", map::default_val(false));
 		if (m_dh)
 			m_vi.height *= 2;
+		else if (m_vi.height % 2 || (m_vi.height >> m_vi.format->subSamplingH) % 2)
+			throw std::runtime_error{ "clip must have even number of scanlines" };
 
 		if ((m_mode == FieldOperation::BOB_BOTTOM_FIRST || m_mode == FieldOperation::BOB_TOP_FIRST) && !m_dh) {
 			m_vi.numFrames = int64ToIntS(m_vi.numFrames * 2LL);
