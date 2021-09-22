@@ -28,26 +28,26 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>Intel C++ Compiler 19.1</PlatformToolset>
+    <PlatformToolset>Intel C++ Compiler 2021</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>Intel C++ Compiler 19.1</PlatformToolset>
+    <PlatformToolset>Intel C++ Compiler 2021</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>true</UseDebugLibraries>
-    <PlatformToolset>Intel C++ Compiler 19.1</PlatformToolset>
+    <PlatformToolset>Intel C++ Compiler 2021</PlatformToolset>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'" Label="Configuration">
     <ConfigurationType>StaticLibrary</ConfigurationType>
     <UseDebugLibraries>false</UseDebugLibraries>
-    <PlatformToolset>Intel C++ Compiler 19.1</PlatformToolset>
+    <PlatformToolset>Intel C++ Compiler 2021</PlatformToolset>
     <WholeProgramOptimization>true</WholeProgramOptimization>
     <CharacterSet>Unicode</CharacterSet>
   </PropertyGroup>
@@ -77,6 +77,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>ZNEDI3_X86;ZNEDI3_X86_AVX512;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;NOMINMAX;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(ProjectDir)..\..\znedi3</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
@@ -86,6 +87,7 @@
       <SDLCheck>true</SDLCheck>
       <PreprocessorDefinitions>ZNEDI3_X86;ZNEDI3_X86_AVX512;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;NOMINMAX;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>$(ProjectDir)..\..\znedi3</AdditionalIncludeDirectories>
+      <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
   </ItemDefinitionGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -144,16 +146,12 @@
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AdvancedVectorExtensions</EnableEnhancedInstructionSet>
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AdvancedVectorExtensions</EnableEnhancedInstructionSet>
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">AdvancedVectorExtensions</EnableEnhancedInstructionSet>
-      <InterproceduralOptimization Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">SingleFile</InterproceduralOptimization>
-      <InterproceduralOptimization Condition="'$(Configuration)|$(Platform)'=='Release|x64'">SingleFile</InterproceduralOptimization>
     </ClCompile>
     <ClCompile Include="..\..\znedi3\x86\kernel_avx2.cpp">
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AdvancedVectorExtensions2</EnableEnhancedInstructionSet>
-      <InterproceduralOptimization Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">SingleFile</InterproceduralOptimization>
-      <InterproceduralOptimization Condition="'$(Configuration)|$(Platform)'=='Release|x64'">SingleFile</InterproceduralOptimization>
     </ClCompile>
     <ClCompile Include="..\..\znedi3\x86\kernel_avx512.cpp">
       <UseProcessorExtensions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">COMMON512</UseProcessorExtensions>
@@ -161,8 +159,6 @@
       <UseProcessorExtensions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">COMMON512</UseProcessorExtensions>
       <UseProcessorExtensions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">COMMON512</UseProcessorExtensions>
       <AdditionalOptions Condition="!$(PlatformToolset.Contains('Intel C++ Compiler'))">/arch:AVX512</AdditionalOptions>
-      <InterproceduralOptimization Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">SingleFile</InterproceduralOptimization>
-      <InterproceduralOptimization Condition="'$(Configuration)|$(Platform)'=='Release|x64'">SingleFile</InterproceduralOptimization>
     </ClCompile>
     <ClCompile Include="..\..\znedi3\x86\kernel_f16c.cpp">
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AdvancedVectorExtensions</EnableEnhancedInstructionSet>
@@ -171,20 +167,16 @@
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AdvancedVectorExtensions</EnableEnhancedInstructionSet>
       <UseProcessorExtensions Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">AVX2</UseProcessorExtensions>
       <UseProcessorExtensions Condition="'$(Configuration)|$(Platform)'=='Release|x64'">AVX2</UseProcessorExtensions>
-      <InterproceduralOptimization Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">SingleFile</InterproceduralOptimization>
-      <InterproceduralOptimization Condition="'$(Configuration)|$(Platform)'=='Release|x64'">SingleFile</InterproceduralOptimization>
       <UseProcessorExtensions Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">AVX2</UseProcessorExtensions>
       <UseProcessorExtensions Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">AVX2</UseProcessorExtensions>
     </ClCompile>
     <ClCompile Include="..\..\znedi3\x86\kernel_sse.cpp">
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">StreamingSIMDExtensions</EnableEnhancedInstructionSet>
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">StreamingSIMDExtensions</EnableEnhancedInstructionSet>
-      <InterproceduralOptimization Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">SingleFile</InterproceduralOptimization>
     </ClCompile>
     <ClCompile Include="..\..\znedi3\x86\kernel_sse2.cpp">
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
       <EnableEnhancedInstructionSet Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">StreamingSIMDExtensions2</EnableEnhancedInstructionSet>
-      <InterproceduralOptimization Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">SingleFile</InterproceduralOptimization>
     </ClCompile>
     <ClCompile Include="..\..\znedi3\x86\kernel_x86.cpp" />
     <ClCompile Include="..\..\znedi3\znedi3.cpp" />
