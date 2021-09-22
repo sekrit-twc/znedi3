@@ -125,7 +125,7 @@ znedi3_filter::znedi3_filter(const NNEDI3Weights &weights, const znedi3_filter_p
 	assert(model_set.find(traits) != model_set.end());
 	const PredictorModel &model = *model_set.find(traits);
 
-	double pixel_half_val = static_cast<double>((1UL << bit_depth) - 1) / 2.0;
+	double pixel_half_val = (m_type == PixelType::HALF || m_type == PixelType::FLOAT) ? 0.5 : static_cast<double>((1UL << bit_depth) - 1) / 2.0;
 
 	switch (params.prescreen) {
 	case ZNEDI3_PRESCREEN_NONE:
