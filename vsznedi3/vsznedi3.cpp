@@ -32,9 +32,7 @@ enum class FieldOperation {
 void override_cpu_type(znedi3_cpu_type_e &dst, const std::string &str)
 {
 #if defined(__i386) || defined(_M_IX86) || defined(_M_X64) || defined(__x86_64__)
-	if (str == "mmx")
-		dst = ZNEDI3_CPU_X86_MMX;
-	else if (str == "sse")
+	if (str == "sse")
 		dst = ZNEDI3_CPU_X86_SSE;
 	else if (str == "sse2")
 		dst = ZNEDI3_CPU_X86_SSE2;
@@ -52,10 +50,8 @@ void override_cpu_type(znedi3_cpu_type_e &dst, const std::string &str)
 		dst = ZNEDI3_CPU_X86_F16C;
 	else if (str == "avx2")
 		dst = ZNEDI3_CPU_X86_AVX2;
-	else if (str == "avx512f")
+	else if (str == "avx512")
 		dst = ZNEDI3_CPU_X86_AVX512F;
-	else if (str == "avx512_skl")
-		dst = ZNEDI3_CPU_X86_AVX512_SKL;
 #endif
 }
 

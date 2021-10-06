@@ -114,19 +114,17 @@ int arg_decode_cpu(const ArgparseOption *, void *out, const char *param, int)
 	else if (!std::strcmp(param, "auto"))
 		*cpu = ZNEDI3_CPU_AUTO_64B;
 #if defined(__i386) || defined(_M_IX86) || defined(_M_X64) || defined(__x86_64__)
-	ELSE_IF("mmx", ZNEDI3_CPU_X86_MMX);
-	ELSE_IF("sse", ZNEDI3_CPU_X86_SSE);
-	ELSE_IF("sse2", ZNEDI3_CPU_X86_SSE2);
-	ELSE_IF("sse3", ZNEDI3_CPU_X86_SSE3);
-	ELSE_IF("ssse3", ZNEDI3_CPU_X86_SSSE3);
-	ELSE_IF("sse41", ZNEDI3_CPU_X86_SSE41);
-	ELSE_IF("sse42", ZNEDI3_CPU_X86_SSE42);
-	ELSE_IF("avx", ZNEDI3_CPU_X86_AVX);
-	ELSE_IF("f16c", ZNEDI3_CPU_X86_F16C);
-	ELSE_IF("avx", ZNEDI3_CPU_X86_AVX);
-	ELSE_IF("avx2", ZNEDI3_CPU_X86_AVX2);
-	ELSE_IF("avx512f", ZNEDI3_CPU_X86_AVX512F);
-	ELSE_IF("avx512_skl", ZNEDI3_CPU_X86_AVX512_SKL);
+	ELSE_IF("sse",    ZNEDI3_CPU_X86_SSE);
+	ELSE_IF("sse2",   ZNEDI3_CPU_X86_SSE2);
+	ELSE_IF("sse3",   ZNEDI3_CPU_X86_SSE3);
+	ELSE_IF("ssse3",  ZNEDI3_CPU_X86_SSSE3);
+	ELSE_IF("sse41",  ZNEDI3_CPU_X86_SSE41);
+	ELSE_IF("sse42",  ZNEDI3_CPU_X86_SSE42);
+	ELSE_IF("avx",    ZNEDI3_CPU_X86_AVX);
+	ELSE_IF("f16c",   ZNEDI3_CPU_X86_F16C);
+	ELSE_IF("avx",    ZNEDI3_CPU_X86_AVX);
+	ELSE_IF("avx2",   ZNEDI3_CPU_X86_AVX2);
+	ELSE_IF("avx512", ZNEDI3_CPU_X86_AVX512F);
 #endif
 	else
 		std::cerr << "unrecognized CPU type: " << param;

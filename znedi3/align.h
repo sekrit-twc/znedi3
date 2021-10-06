@@ -8,12 +8,12 @@ namespace znedi3 {
 /**
  * 64-byte alignment allows the use of instructions up to AVX-512.
  */
-#ifdef ZNEDI3_X86
+#if defined(ZNEDI3_X86)
 constexpr int ALIGNMENT = 64;
 constexpr int ALIGNMENT_RELAXED = 32;
 #else
-constexpr int ALIGNMENT = sizeof(long double);
-constexpr int ALIGNMENT_RELAXED = sizeof(long double);
+constexpr int ALIGNMENT = alignof(long double);
+constexpr int ALIGNMENT_RELAXED = alignof(long double);
 #endif
 
 /**
@@ -31,14 +31,12 @@ template <class T>
 constexpr T floor_n(T x, unsigned n) { return x & ~static_cast<T>(n - 1); }
 
 /**
- * Helper struct that computes alignment in units of object count.
+ * Alignment in units of object count.
  *
  * @tparam T type of object
  */
 template <class T>
-struct AlignmentOf {
-	static constexpr unsigned value = ALIGNMENT / sizeof(T);
-};
+constexpr unsigned AlignmentOf = ALIGNMENT >= sizeof(T) ? ALIGNMENT / sizeof(T) : 1;
 
 } // namespace znedi3
 
