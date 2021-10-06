@@ -6,13 +6,41 @@
 #include <stdexcept>
 #include <type_traits>
 #include <vector>
+#include <znedi3.h>
+#include "aligned_malloc.h"
 #include "argparse.h"
 #include "timer.h"
 #include "win32_bitmap.h"
-#include "alloc.h"
-#include "znedi3.h"
 
 namespace {
+
+template <class T>
+struct AlignedAllocator {
+	typedef T value_type;
+
+	AlignedAllocator() = default;
+
+	template <class U>
+	AlignedAllocator(const AlignedAllocator<U> &) noexcept {}
+
+	T *allocate(size_t n) const
+	{
+		T *ptr = static_cast<T *>(aligned_malloc(n * sizeof(T), 64));
+
+		if (!ptr)
+			throw std::bad_alloc{};
+
+		return ptr;
+	}
+
+	void deallocate(void *ptr, size_t) const noexcept
+	{
+		aligned_free(ptr);
+	}
+
+	bool operator==(const AlignedAllocator &) const noexcept { return true; }
+	bool operator!=(const AlignedAllocator &) const noexcept { return false; }
+};
 
 struct FreeWeights {
 	void operator()(znedi3_weights *ptr) const { znedi3_weights_free(ptr); }
@@ -23,7 +51,7 @@ struct FreeFilter {
 };
 
 struct PlanarImage {
-	znedi3::AlignedVector<unsigned char> data[3];
+	std::vector<unsigned char, AlignedAllocator<unsigned char>> data[3];
 	ptrdiff_t stride[3];
 	unsigned width[3];
 	unsigned height[3];
@@ -154,7 +182,7 @@ constexpr ArgparseCommandLine program_cmd = {
 
 void execute(const Arguments &args, const znedi3_filter *filter, const PlanarImage &in, PlanarImage &out)
 {
-	znedi3::AlignedVector<unsigned char> tmp(znedi3_filter_get_tmp_size(filter, in.width[0], in.height[0] / 2));
+	std::shared_ptr<void> tmp(aligned_malloc(znedi3_filter_get_tmp_size(filter, in.width[0], in.height[0] / 2), 64), aligned_free);
 
 	std::pair<double, double> results = measure_benchmark(args.times, [&]()
 	{
@@ -163,14 +191,14 @@ void execute(const Arguments &args, const znedi3_filter *filter, const PlanarIma
 			if (args.top) {
 				znedi3_filter_process(filter, out.width[p], out.height[p] / 2,
 				                      in.data[p].data() + in.stride[p], in.stride[p] * 2, out.data[p].data(), out.stride[p] * 2,
-				                      tmp.data(), 0);
+				                      tmp.get(), 0);
 			}
 
 			// Interpolate bottom field.
 			if (args.bottom) {
 				znedi3_filter_process(filter, out.width[p], out.height[p] / 2,
 				                      in.data[p].data(), in.stride[p] * 2, out.data[p].data() + out.stride[p], out.stride[p] * 2,
-				                      tmp.data(), 1);
+				                      tmp.get(), 1);
 			}
 		}
 	});

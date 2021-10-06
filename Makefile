@@ -34,6 +34,7 @@ znedi3_OBJS = \
 	znedi3/znedi3_impl.o
 
 testapp_HDRS = \
+    testapp/aligned_malloc.h \
 	testapp/argparse.h \
 	testapp/mmap.h \
 	testapp/timer.h \
