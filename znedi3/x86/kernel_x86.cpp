@@ -123,13 +123,13 @@ pixel_io_func select_pixel_io_func_x86(PixelType in, PixelType out, CPUClass cpu
 #ifdef ZNEDI3_X86_AVX512
 		if (!ret && cpu == CPUClass::AUTO_64B && caps.avx512f)
 			ret = select_pixel_io_func_avx512f(in, out);
+#endif
 		if (!ret && caps.avx2)
 			ret = select_pixel_io_func_avx2(in, out);
 		if (!ret && caps.avx && caps.f16c)
 			ret = select_pixel_io_func_f16c(in, out);
 		if (!ret && caps.sse2)
 			ret = select_pixel_io_func_sse2(in, out);
-#endif
 	} else {
 #ifdef ZNEDI3_X86_AVX512
 		if (!ret && cpu >= CPUClass::X86_AVX512)

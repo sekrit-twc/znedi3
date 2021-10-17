@@ -104,14 +104,13 @@ typedef struct znedi3_filter znedi3_filter;
 
 void znedi3_filter_params_default(znedi3_filter_params *params);
 
-znedi3_filter *znedi3_filter_create(const znedi3_weights *weights, const znedi3_filter_params *params);
+znedi3_filter *znedi3_filter_create(const znedi3_weights *weights, const znedi3_filter_params *params, unsigned width, unsigned height);
 
 void znedi3_filter_free(znedi3_filter *ptr);
 
-size_t znedi3_filter_get_tmp_size(const znedi3_filter *ptr, unsigned width, unsigned height);
+size_t znedi3_filter_get_tmp_size(const znedi3_filter *ptr);
 
-void znedi3_filter_process(const znedi3_filter *ptr, unsigned width, unsigned height,
-                           const void *src, ptrdiff_t src_stride, void *dst, ptrdiff_t dst_stride, void *tmp, unsigned parity);
+void znedi3_filter_process(const znedi3_filter *ptr, const void *src, ptrdiff_t src_stride, void *dst, ptrdiff_t dst_stride, void *tmp, int parity);
 
 #ifdef __cplusplus
 } /* extern "C" */

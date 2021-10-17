@@ -113,18 +113,14 @@ public:
 		assert(model.first.xdim * model.first.ydim <= 48 * 6);
 	}
 
-	size_t get_tmp_size() const override { return 0; }
+	size_t get_tmp_size() const noexcept override { return 0; }
 
-	void process(const void *src, ptrdiff_t src_stride, void *dst, const unsigned char *prescreen, void *, unsigned n) const override
+	void process(const float * const src[6], float *dst, const unsigned char *prescreen, void *, unsigned n) const noexcept override
 	{
-		const float *src_p = static_cast<const float *>(src);
-		float *dst_p = static_cast<float *>(dst);
-		ptrdiff_t src_stride_f = src_stride / sizeof(float);
+		ptrdiff_t window_offset_y = 3 - static_cast<ptrdiff_t>(m_model.ydim / 2);
+		ptrdiff_t window_offset_x = m_model.xdim / 2 - 1;
 
-		// Adjust source pointer to point to top-left of filter window.
-		const float *window = src_p - static_cast<ptrdiff_t>(m_model.ydim / 2) * src_stride_f - (m_model.xdim / 2 - 1);
-
-		for (unsigned i = 0; i < n; ++i) {
+		for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(n); ++i) {
 			if (prescreen[i])
 				continue;
 
@@ -132,10 +128,10 @@ public:
 			alignas(16) float activation[256 * 2];
 			alignas(16) float mstd[4];
 
-			Traits::gather_input(window + i, src_stride, m_model.xdim, m_model.ydim, input, mstd, m_inv_filter_size);
+			Traits::gather_input(src + window_offset_y, i - window_offset_x, m_model.xdim, m_model.ydim, input, mstd, m_inv_filter_size);
 			apply_model(input, activation, mstd);
 
-			dst_p[i] = mstd[3] * (m_use_q2 ? 0.5f : 1.0f);
+			dst[i] = mstd[3] * (m_use_q2 ? 0.5f : 1.0f);
 		}
 	}
 };

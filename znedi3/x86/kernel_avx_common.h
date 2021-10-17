@@ -129,12 +129,12 @@ inline FORCE_INLINE __m256 mm256_elliott_ps(__m256 x)
 }
 
 
-inline FORCE_INLINE void prescreener_old_layer0_avx(const float kernel[4][48], const float bias[4], const float *window, ptrdiff_t src_stride,
+inline FORCE_INLINE void prescreener_old_layer0_avx(const float kernel[4][48], const float bias[4], const float * const src[4], ptrdiff_t offset_x,
                                                     float *activation, ptrdiff_t activation_stride, unsigned n)
 {
 	ptrdiff_t activation_stride_f = activation_stride / sizeof(float);
 
-	for (unsigned i = 0; i < n; i += 8) {
+	for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(n); i += 8) {
 		_mm256_store_ps(activation + 0 * activation_stride_f + i, _mm256_setzero_ps());
 		_mm256_store_ps(activation + 1 * activation_stride_f + i, _mm256_setzero_ps());
 		_mm256_store_ps(activation + 2 * activation_stride_f + i, _mm256_setzero_ps());
@@ -142,10 +142,10 @@ inline FORCE_INLINE void prescreener_old_layer0_avx(const float kernel[4][48], c
 	}
 
 	// Compute 48x4 convolution.
-	for (unsigned k = 0; k < 4; ++k) {
-		const float *window_p = window + k * (src_stride / sizeof(float));
+	for (ptrdiff_t k = 0; k < 4; ++k) {
+		const float *window_p = src[k] + offset_x;
 
-		for (unsigned kk = 0; kk < 12; kk += 2) {
+		for (ptrdiff_t kk = 0; kk < 12; kk += 2) {
 			const __m256 n0_c0 = _mm256_broadcast_ss(&kernel[0][12 * k + kk + 0]);
 			const __m256 n0_c1 = _mm256_broadcast_ss(&kernel[0][12 * k + kk + 1]);
 
@@ -158,7 +158,7 @@ inline FORCE_INLINE void prescreener_old_layer0_avx(const float kernel[4][48], c
 			const __m256 n3_c0 = _mm256_broadcast_ss(&kernel[3][12 * k + kk + 0]);
 			const __m256 n3_c1 = _mm256_broadcast_ss(&kernel[3][12 * k + kk + 1]);
 
-			for (unsigned i = 0; i < n; i += 8) {
+			for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(n); i += 8) {
 				__m256 x0 = _mm256_loadu_ps(window_p + i + kk);
 				__m256 x1 = _mm256_loadu_ps(window_p + i + kk + 1);
 
@@ -332,26 +332,22 @@ public:
 		subtract_mean(m_data, half);
 	}
 
-	size_t get_tmp_size() const override
+	size_t get_tmp_size() const noexcept override
 	{
 		return 12 * 512 * sizeof(float);
 	}
 
-	void process(const void *src, ptrdiff_t src_stride, unsigned char *prescreen, void *tmp, unsigned n) const override
+	void process(const float * const src[4], unsigned char *prescreen, void *tmp, unsigned n) const noexcept override
 	{
 		float *activation = static_cast<float *>(tmp);
 		ptrdiff_t activation_stride = 512 * sizeof(float);
 
-		const float *src_p = static_cast<const float *>(src);
-		ptrdiff_t src_stride_f = src_stride / sizeof(float);
+		ptrdiff_t window_offset = 5;
 
-		// Adjust source pointer to point to top-left of filter window.
-		const float *window = src_p - 2 * src_stride_f - 5;
+		for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(n); i += 512) {
+			ptrdiff_t nn = i + 512 > static_cast<ptrdiff_t>(n) ? static_cast<ptrdiff_t>(n) - i : 512;
 
-		for (unsigned i = 0; i < n; i += 512) {
-			unsigned nn = i + 512 > n ? n - i : 512;
-
-			prescreener_old_layer0_avx(m_data.kernel_l0, m_data.bias_l0, window + i, src_stride, activation, activation_stride, nn);
+			prescreener_old_layer0_avx(m_data.kernel_l0, m_data.bias_l0, src, i - window_offset, activation, activation_stride, nn);
 			prescreener_old_layer1_avx(m_data.kernel_l1, m_data.bias_l1, activation, activation_stride, nn);
 			prescreener_old_layer2_avx(m_data.kernel_l2, m_data.bias_l2, activation, activation_stride, prescreen + i, nn);
 		}
@@ -368,17 +364,17 @@ public:
 		subtract_mean(m_data[0], half);
 	}
 
-	size_t get_tmp_size() const override { return 0; }
+	size_t get_tmp_size() const noexcept override { return 0; }
 
-	void process(const void *src, ptrdiff_t src_stride, unsigned char *prescreen, void *, unsigned n) const override
+	void process(const float * const src[4], unsigned char *prescreen, void *, unsigned n) const noexcept override
 	{
 		const PrescreenerNewCoefficients &data = m_data.front();
+		ptrdiff_t window_offset = 6;
 
-		const float *src_p = static_cast<const float *>(src);
-		ptrdiff_t src_stride_f = src_stride / sizeof(float);
-
-		// Adjust source pointer to point to top-left of filter window.
-		const float *window = src_p - 2 * src_stride_f - 6;
+		const float *srcp0 = src[0];
+		const float *srcp1 = src[1];
+		const float *srcp2 = src[2];
+		const float *srcp3 = src[3];
 
 		for (ptrdiff_t j = 0; j < static_cast<ptrdiff_t>(n); j += 8) {
 			// Layer 1.
@@ -388,15 +384,15 @@ public:
 			__m256 tmp0, tmp1, tmp2, tmp3;
 
 			// Pixels [0-3].
-			x0a = _mm256_loadu_ps(window + 0 * src_stride_f + j + 0);
-			x1a = _mm256_loadu_ps(window + 1 * src_stride_f + j + 0);
-			x2a = _mm256_loadu_ps(window + 2 * src_stride_f + j + 0);
-			x3a = _mm256_loadu_ps(window + 3 * src_stride_f + j + 0);
+			x0a = _mm256_loadu_ps(srcp0 - window_offset + j + 0);
+			x1a = _mm256_loadu_ps(srcp1 - window_offset + j + 0);
+			x2a = _mm256_loadu_ps(srcp2 - window_offset + j + 0);
+			x3a = _mm256_loadu_ps(srcp3 - window_offset + j + 0);
 
-			x0b = _mm256_loadu_ps(window + 0 * src_stride_f + j + 8);
-			x1b = _mm256_loadu_ps(window + 1 * src_stride_f + j + 8);
-			x2b = _mm256_loadu_ps(window + 2 * src_stride_f + j + 8);
-			x3b = _mm256_loadu_ps(window + 3 * src_stride_f + j + 8);
+			x0b = _mm256_loadu_ps(srcp0 - window_offset + j + 8);
+			x1b = _mm256_loadu_ps(srcp1 - window_offset + j + 8);
+			x2b = _mm256_loadu_ps(srcp2 - window_offset + j + 8);
+			x3b = _mm256_loadu_ps(srcp3 - window_offset + j + 8);
 
 			// x0a-x3a.
 			tmp0 = _mm256_mul_ps(_mm256_load_ps(data.kernel_l0[0] + 0), x0a);
@@ -446,15 +442,15 @@ public:
 			partial0 = _mm256_add_ps(tmp0, tmp2);
 
 			// Pixels [4-7].
-			x0a = _mm256_loadu_ps(window + 0 * src_stride_f + j + 4);
-			x1a = _mm256_loadu_ps(window + 1 * src_stride_f + j + 4);
-			x2a = _mm256_loadu_ps(window + 2 * src_stride_f + j + 4);
-			x3a = _mm256_loadu_ps(window + 3 * src_stride_f + j + 4);
+			x0a = _mm256_loadu_ps(srcp0 - window_offset + j + 4);
+			x1a = _mm256_loadu_ps(srcp1 - window_offset + j + 4);
+			x2a = _mm256_loadu_ps(srcp2 - window_offset + j + 4);
+			x3a = _mm256_loadu_ps(srcp3 - window_offset + j + 4);
 
-			x0b = _mm256_loadu_ps(window + 0 * src_stride_f + j + 12);
-			x1b = _mm256_loadu_ps(window + 1 * src_stride_f + j + 12);
-			x2b = _mm256_loadu_ps(window + 2 * src_stride_f + j + 12);
-			x3b = _mm256_loadu_ps(window + 3 * src_stride_f + j + 12);
+			x0b = _mm256_loadu_ps(srcp0 - window_offset + j + 12);
+			x1b = _mm256_loadu_ps(srcp1 - window_offset + j + 12);
+			x2b = _mm256_loadu_ps(srcp2 - window_offset + j + 12);
+			x3b = _mm256_loadu_ps(srcp3 - window_offset + j + 12);
 
 			// x0a-x3a.
 			tmp0 = _mm256_mul_ps(_mm256_load_ps(data.kernel_l0[0] + 0), x0a);
@@ -534,34 +530,127 @@ public:
 };
 
 
-inline FORCE_INLINE void gather_pixels_avx(const float *src, ptrdiff_t src_stride, ptrdiff_t xdim, ptrdiff_t ydim, float *buf, __m256d *partial_sum_sumsq)
+inline FORCE_INLINE void gather_pixels_avx(const float * const *src, ptrdiff_t offset_x, ptrdiff_t xdim, ptrdiff_t ydim, float *buf, __m256d *partial_sum_sumsq)
 {
-	ptrdiff_t src_stride_f = src_stride / sizeof(float);
-
 	__m256d sum0 = _mm256_setzero_pd();
 	__m256d sum1 = _mm256_setzero_pd();
 	__m256d sumsq0 = _mm256_setzero_pd();
 	__m256d sumsq1 = _mm256_setzero_pd();
 
-	for (ptrdiff_t i = 0; i < ydim; ++i) {
+	{
+		const float *srcp0 = src[0];
+		const float *srcp1 = src[1];
+		const float *srcp2 = src[2];
+		const float *srcp3 = src[3];
+
 		for (ptrdiff_t j = 0; j < xdim; j += 8) {
-			__m128 val0 = _mm_loadu_ps(src + j + 0);
-			__m128 val1 = _mm_loadu_ps(src + j + 4);
+			{
+				__m128 val0 = _mm_loadu_ps(srcp0 + offset_x + j + 0);
+				__m128 val1 = _mm_loadu_ps(srcp0 + offset_x + j + 4);
 
-			__m256d vald0 = _mm256_cvtps_pd(val0);
-			__m256d vald1 = _mm256_cvtps_pd(val1);
+				__m256d vald0 = _mm256_cvtps_pd(val0);
+				__m256d vald1 = _mm256_cvtps_pd(val1);
 
-			sum0 = _mm256_add_pd(sum0, vald0);
-			sum1 = _mm256_add_pd(sum1, vald1);
+				sum0 = _mm256_add_pd(sum0, vald0);
+				sum1 = _mm256_add_pd(sum1, vald1);
 
-			sumsq0 = mm256_fmadd_pd(vald0, vald0, sumsq0);
-			sumsq1 = mm256_fmadd_pd(vald1, vald1, sumsq1);
+				sumsq0 = mm256_fmadd_pd(vald0, vald0, sumsq0);
+				sumsq1 = mm256_fmadd_pd(vald1, vald1, sumsq1);
 
-			_mm_store_ps(buf + j + 0, val0);
-			_mm_store_ps(buf + j + 4, val1);
+				_mm_store_ps(buf + 0 * xdim + j + 0, val0);
+				_mm_store_ps(buf + 0 * xdim + j + 4, val1);
+			}
+			{
+				__m128 val0 = _mm_loadu_ps(srcp1 + offset_x + j + 0);
+				__m128 val1 = _mm_loadu_ps(srcp1 + offset_x + j + 4);
+
+				__m256d vald0 = _mm256_cvtps_pd(val0);
+				__m256d vald1 = _mm256_cvtps_pd(val1);
+
+				sum0 = _mm256_add_pd(sum0, vald0);
+				sum1 = _mm256_add_pd(sum1, vald1);
+
+				sumsq0 = mm256_fmadd_pd(vald0, vald0, sumsq0);
+				sumsq1 = mm256_fmadd_pd(vald1, vald1, sumsq1);
+
+				_mm_store_ps(buf + 1 * xdim + j + 0, val0);
+				_mm_store_ps(buf + 1 * xdim + j + 4, val1);
+			}
+			{
+				__m128 val0 = _mm_loadu_ps(srcp2 + offset_x + j + 0);
+				__m128 val1 = _mm_loadu_ps(srcp2 + offset_x + j + 4);
+
+				__m256d vald0 = _mm256_cvtps_pd(val0);
+				__m256d vald1 = _mm256_cvtps_pd(val1);
+
+				sum0 = _mm256_add_pd(sum0, vald0);
+				sum1 = _mm256_add_pd(sum1, vald1);
+
+				sumsq0 = mm256_fmadd_pd(vald0, vald0, sumsq0);
+				sumsq1 = mm256_fmadd_pd(vald1, vald1, sumsq1);
+
+				_mm_store_ps(buf + 2 * xdim + j + 0, val0);
+				_mm_store_ps(buf + 2 * xdim + j + 4, val1);
+			}
+			{
+				__m128 val0 = _mm_loadu_ps(srcp3 + offset_x + j + 0);
+				__m128 val1 = _mm_loadu_ps(srcp3 + offset_x + j + 4);
+
+				__m256d vald0 = _mm256_cvtps_pd(val0);
+				__m256d vald1 = _mm256_cvtps_pd(val1);
+
+				sum0 = _mm256_add_pd(sum0, vald0);
+				sum1 = _mm256_add_pd(sum1, vald1);
+
+				sumsq0 = mm256_fmadd_pd(vald0, vald0, sumsq0);
+				sumsq1 = mm256_fmadd_pd(vald1, vald1, sumsq1);
+
+				_mm_store_ps(buf + 3 * xdim + j + 0, val0);
+				_mm_store_ps(buf + 3 * xdim + j + 4, val1);
+			}
 		}
-		src += src_stride_f;
-		buf += xdim;
+		buf += 4 * xdim;
+	}
+
+	if (ydim > 4) {
+		const float *srcp4 = static_cast<const float *>(src[4]);
+		const float *srcp5 = static_cast<const float *>(src[5]);
+
+		for (ptrdiff_t j = 0; j < xdim; j += 8) {
+			{
+				__m128 val0 = _mm_loadu_ps(srcp4 + offset_x + j + 0);
+				__m128 val1 = _mm_loadu_ps(srcp4 + offset_x + j + 4);
+
+				__m256d vald0 = _mm256_cvtps_pd(val0);
+				__m256d vald1 = _mm256_cvtps_pd(val1);
+
+				sum0 = _mm256_add_pd(sum0, vald0);
+				sum1 = _mm256_add_pd(sum1, vald1);
+
+				sumsq0 = mm256_fmadd_pd(vald0, vald0, sumsq0);
+				sumsq1 = mm256_fmadd_pd(vald1, vald1, sumsq1);
+
+				_mm_store_ps(buf + 0 * xdim + j + 0, val0);
+				_mm_store_ps(buf + 0 * xdim + j + 4, val1);
+			}
+			{
+				__m128 val0 = _mm_loadu_ps(srcp5 + offset_x + j + 0);
+				__m128 val1 = _mm_loadu_ps(srcp5 + offset_x + j + 4);
+
+				__m256d vald0 = _mm256_cvtps_pd(val0);
+				__m256d vald1 = _mm256_cvtps_pd(val1);
+
+				sum0 = _mm256_add_pd(sum0, vald0);
+				sum1 = _mm256_add_pd(sum1, vald1);
+
+				sumsq0 = mm256_fmadd_pd(vald0, vald0, sumsq0);
+				sumsq1 = mm256_fmadd_pd(vald1, vald1, sumsq1);
+
+				_mm_store_ps(buf + 1 * xdim + j + 0, val0);
+				_mm_store_ps(buf + 1 * xdim + j + 4, val1);
+			}
+		}
+		buf += 2 * xdim;
 	}
 
 	partial_sum_sumsq[0] = _mm256_add_pd(sum0, sum1);
@@ -808,7 +897,7 @@ public:
 		assert(model.first.xdim * model.first.ydim <= 48 * 6);
 	}
 
-	size_t get_tmp_size() const override
+	size_t get_tmp_size() const noexcept override
 	{
 		FakeAllocator alloc;
 
@@ -819,16 +908,12 @@ public:
 		return alloc.count();
 	}
 
-	void process(const void *src, ptrdiff_t src_stride, void *dst, const unsigned char *prescreen, void *tmp, unsigned n) const override
+	void process(const float * const src[6], float *dst, const unsigned char *prescreen, void *tmp, unsigned n) const noexcept override
 	{
 		LinearAllocator alloc{ tmp };
 
-		const float *src_p = static_cast<const float *>(src);
-		float *dst_p = static_cast<float *>(dst);
-		ptrdiff_t src_stride_f = src_stride / sizeof(float);
-
-		// Adjust source pointer to point to top-left of filter window.
-		const float *window = src_p - static_cast<ptrdiff_t>(m_model.ydim / 2) * src_stride_f - (m_model.xdim / 2 - 1);
+		ptrdiff_t window_offset_y = 3 - static_cast<ptrdiff_t>(m_model.ydim / 2);
+		ptrdiff_t window_offset_x = m_model.xdim / 2 - 1;
 		unsigned filter_size = m_model.xdim * m_model.ydim;
 
 		float *input = alloc.allocate_n<float>(48 * 6 * 4);
@@ -839,21 +924,21 @@ public:
 		unsigned gathered_idx[4];
 		unsigned num_gathered = 0;
 
-		for (unsigned i = 0; i < n; ++i) {
+		for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(n); ++i) {
 			if (prescreen[i])
 				continue;
 
-			gather_pixels_avx(window + i, src_stride, m_model.xdim, m_model.ydim, input + num_gathered * filter_size, partial_sum_sumsq + num_gathered * 2);
+			gather_pixels_avx(src + window_offset_y, i - window_offset_x, m_model.xdim, m_model.ydim, input + num_gathered * filter_size, partial_sum_sumsq + num_gathered * 2);
 			gathered_idx[num_gathered] = i;
 			++num_gathered;
 
 			if (num_gathered == 4) {
 				apply_model(input, activation, mstd, partial_sum_sumsq);
 
-				dst_p[gathered_idx[0]] = mstd[3 * 4 + 0];
-				dst_p[gathered_idx[1]] = mstd[3 * 4 + 1];
-				dst_p[gathered_idx[2]] = mstd[3 * 4 + 2];
-				dst_p[gathered_idx[3]] = mstd[3 * 4 + 3];
+				dst[gathered_idx[0]] = mstd[3 * 4 + 0];
+				dst[gathered_idx[1]] = mstd[3 * 4 + 1];
+				dst[gathered_idx[2]] = mstd[3 * 4 + 2];
+				dst[gathered_idx[3]] = mstd[3 * 4 + 3];
 
 				num_gathered = 0;
 			}
@@ -862,28 +947,24 @@ public:
 			apply_model(input, activation, mstd, partial_sum_sumsq);
 
 			for (unsigned idx = 0; idx < num_gathered; ++idx) {
-				dst_p[gathered_idx[idx]] = mstd[3 * 4 + idx];
+				dst[gathered_idx[idx]] = mstd[3 * 4 + idx];
 			}
 		}
 	}
 };
 
 
-void cubic_interpolation_avx_impl(const void *src, ptrdiff_t src_stride, void *dst, const unsigned char *prescreen, unsigned n)
+void cubic_interpolation_avx_impl(const float * const src[4], float *dst, const unsigned char *prescreen, unsigned n)
 {
-	const float *src_p = static_cast<const float *>(src);
-	float *dst_p = static_cast<float *>(dst);
-	ptrdiff_t src_stride_f = src_stride / sizeof(float);
-
-	const float *src_p0 = src_p - 2 * src_stride_f;
-	const float *src_p1 = src_p - 1 * src_stride_f;
-	const float *src_p2 = src_p + 0 * src_stride_f;
-	const float *src_p3 = src_p + 1 * src_stride_f;
+	const float *srcp0 = src[0];
+	const float *srcp1 = src[1];
+	const float *srcp2 = src[2];
+	const float *srcp3 = src[3];
 
 	const __m256 k0 = _mm256_set1_ps(-3.0f / 32.0f);
 	const __m256 k1 = _mm256_set1_ps(19.0f / 32.0f);
 
-	for (unsigned i = 0; i < n - (n % 8); i += 8) {
+	for (unsigned i = 0; i < n; i += 8) {
 		__m128i masklo = _mm_cvtsi32_si128(*(const uint32_t *)(prescreen + i + 0));
 		__m128i maskhi = _mm_cvtsi32_si128(*(const uint32_t *)(prescreen + i + 4));
 		masklo = _mm_unpacklo_epi8(masklo, masklo);
@@ -892,30 +973,18 @@ void cubic_interpolation_avx_impl(const void *src, ptrdiff_t src_stride, void *d
 		maskhi = _mm_unpacklo_epi16(maskhi, maskhi);
 
 		__m256i mask = _mm256_insertf128_si256(_mm256_castsi128_si256(masklo), maskhi, 1);
-		__m256 orig = _mm256_load_ps(dst_p + i);
+		__m256 orig = _mm256_load_ps(dst + i);
 		orig = _mm256_andnot_ps(_mm256_castsi256_ps(mask), orig);
 
-		__m256 accum = _mm256_mul_ps(k0, _mm256_load_ps(src_p0 + i));
-		accum = mm256_fmadd_ps(k1, _mm256_load_ps(src_p1 + i), accum);
-		accum = mm256_fmadd_ps(k1, _mm256_load_ps(src_p2 + i), accum);
-		accum = mm256_fmadd_ps(k0, _mm256_load_ps(src_p3 + i), accum);
+		__m256 accum = _mm256_mul_ps(k0, _mm256_load_ps(srcp0 + i));
+		accum = mm256_fmadd_ps(k1, _mm256_load_ps(srcp1 + i), accum);
+		accum = mm256_fmadd_ps(k1, _mm256_load_ps(srcp2 + i), accum);
+		accum = mm256_fmadd_ps(k0, _mm256_load_ps(srcp3 + i), accum);
 
 		accum = _mm256_and_ps(_mm256_castsi256_ps(mask), accum);
 		accum = _mm256_or_ps(orig, accum);
 
-		_mm256_store_ps(dst_p + i, accum);
-	}
-	for (unsigned i = n - (n % 8); i < n; ++i) {
-		if (!prescreen[i])
-			continue;
-
-		float accum = 0.0f;
-		accum += (-3.0f / 32.0f) * src_p0[i];
-		accum += (19.0f / 32.0f) * src_p1[i];
-		accum += (19.0f / 32.0f) * src_p2[i];
-		accum += (-3.0f / 32.0f) * src_p3[i];
-
-		dst_p[i] = accum;
+		_mm256_store_ps(dst + i, accum);
 	}
 }
 

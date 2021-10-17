@@ -69,12 +69,12 @@ void word_to_float_sse2(const void *src, void *dst, size_t n);
 void float_to_byte_sse2(const void *src, void *dst, size_t n);
 void float_to_word_sse2(const void *src, void *dst, size_t n);
 
-void cubic_interpolation_sse2(const void *src, ptrdiff_t src_stride, void *dst, const unsigned char *prescreen, unsigned n);
+void cubic_interpolation_sse2(const float * const src[4], float *dst, const unsigned char *prescreen, unsigned n);
 
 std::unique_ptr<Predictor> create_predictor_sse2(const PredictorModel &model, bool use_q2);
 
 // AVX
-void cubic_interpolation_avx(const void *src, ptrdiff_t src_stride, void *dst, const unsigned char *prescreen, unsigned n);
+void cubic_interpolation_avx(const float * const src[4], float *dst, const unsigned char *prescreen, unsigned n);
 
 std::unique_ptr<Prescreener> create_prescreener_old_avx(const PrescreenerOldCoefficients &coeffs, double pixel_half);
 std::unique_ptr<Prescreener> create_prescreener_new_avx(const PrescreenerNewCoefficients &coeffs, double pixel_half);
@@ -90,7 +90,7 @@ void word_to_float_avx2(const void *src, void *dst, size_t n);
 void float_to_byte_avx2(const void *src, void *dst, size_t n);
 void float_to_word_avx2(const void *src, void *dst, size_t n);
 
-void cubic_interpolation_avx2(const void *src, ptrdiff_t src_stride, void *dst, const unsigned char *prescreen, unsigned n);
+void cubic_interpolation_avx2(const float * const src[4], float *dst, const unsigned char *prescreen, unsigned n);
 
 std::unique_ptr<Prescreener> create_prescreener_old_avx2(const PrescreenerOldCoefficients &coeffs, double pixel_half);
 std::unique_ptr<Prescreener> create_prescreener_new_avx2(const PrescreenerNewCoefficients &coeffs, double pixel_half);
@@ -104,7 +104,7 @@ void float_to_byte_avx512f(const void *src, void *dst, size_t n);
 void float_to_word_avx512f(const void *src, void *dst, size_t n);
 void float_to_half_avx512f(const void *src, void *dst, size_t n);
 
-void cubic_interpolation_avx512f(const void *src, ptrdiff_t src_stride, void *dst, const unsigned char *prescreen, unsigned n);
+void cubic_interpolation_avx512f(const float * const src[4], float *dst, const unsigned char *prescreen, unsigned n);
 
 std::unique_ptr<Prescreener> create_prescreener_old_avx512f(const PrescreenerOldCoefficients &coeffs, double pixel_half);
 std::unique_ptr<Prescreener> create_prescreener_new_avx512f(const PrescreenerNewCoefficients &coeffs, double pixel_half);

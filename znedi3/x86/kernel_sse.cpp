@@ -104,17 +104,12 @@ public:
 		std::copy_n(d.bias_l2, 4, m_data[0].bias_l2);
 	}
 
-	size_t get_tmp_size() const override { return 0; }
+	size_t get_tmp_size() const noexcept override { return 0; }
 
-	void process(const void *src, ptrdiff_t src_stride, unsigned char *prescreen, void *tmp, unsigned n) const override
+	void process(const float * const src[4], unsigned char *prescreen, void *tmp, unsigned n) const noexcept override
 	{
 		const InterleavedPrescreenerOldCoefficients &data = m_data.front();
-
-		const float *src_p = static_cast<const float *>(src);
-		ptrdiff_t src_stride_f = src_stride / sizeof(float);
-
-		// Adjust source pointer to point to top-left of filter window.
-		const float *window = src_p - 2 * src_stride_f - 5;
+		ptrdiff_t window_offset = 6;
 
 		for (ptrdiff_t j = 0; j < static_cast<ptrdiff_t>(n); ++j) {
 			__m128 accum0 = _mm_setzero_ps();
@@ -124,8 +119,10 @@ public:
 
 			// Layer 0.
 			for (ptrdiff_t ki = 0; ki < 4; ++ki) {
+				const float *srcp = src[ki];
+
 				for (ptrdiff_t kj = 0; kj < 12; kj += 4) {
-					__m128 xtmp = _mm_loadu_ps(window + ki * src_stride_f + j + kj);
+					__m128 xtmp = _mm_loadu_ps(srcp - window_offset + j + kj);
 					__m128 x, coeffs;
 
 					coeffs = _mm_load_ps(data.kernel_l0[ki * 12 + kj + 0]);
@@ -226,17 +223,12 @@ public:
 		std::copy_n(d.bias_l1, 4, m_data[0].bias_l1);
 	}
 
-	size_t get_tmp_size() const override { return 0; }
+	size_t get_tmp_size() const noexcept override { return 0; }
 
-	void process(const void *src, ptrdiff_t src_stride, unsigned char *prescreen, void *tmp, unsigned n) const override
+	void process(const float * const src[4], unsigned char *prescreen, void *tmp, unsigned n) const noexcept override
 	{
 		const InterleavedPrescreenerNewCoefficients &data = m_data.front();
-
-		const float *src_p = static_cast<const float *>(src);
-		ptrdiff_t src_stride_f = src_stride / sizeof(float);
-
-		// Adjust source pointer to point to top-left of filter window.
-		const float *window = src_p - 2 * src_stride_f - 6;
+		ptrdiff_t window_offset = 6;
 
 		for (ptrdiff_t j = 0; j < static_cast<ptrdiff_t>(n); j += 4) {
 			__m128 accum0 = _mm_setzero_ps();
@@ -246,8 +238,10 @@ public:
 
 			// Layer 0.
 			for (ptrdiff_t ki = 0; ki < 4; ++ki) {
+				const float *srcp = src[ki];
+
 				for (ptrdiff_t kj = 0; kj < 16; kj += 4) {
-					__m128 xtmp = _mm_loadu_ps(window + ki * src_stride_f + j + kj);
+					__m128 xtmp = _mm_loadu_ps(srcp - window_offset + j + kj);
 					__m128 x, coeffs;
 
 					coeffs = _mm_load_ps(data.kernel_l0[ki * 16 + kj + 0]);
@@ -300,16 +294,16 @@ public:
 };
 
 
-inline FORCE_INLINE void gather_input_sse(const float *src, ptrdiff_t src_stride, ptrdiff_t xdim, ptrdiff_t ydim, float *buf, float mstd[4], double inv_size)
+inline FORCE_INLINE void gather_input_sse(const float * const *src, ptrdiff_t offset_x, ptrdiff_t xdim, ptrdiff_t ydim, float *buf, float mstd[4], double inv_size)
 {
-	ptrdiff_t src_stride_f = src_stride / sizeof(float);
-
 	double sum = 0;
 	double sum_sq = 0;
 
 	for (ptrdiff_t i = 0; i < ydim; ++i) {
+		const float *srcp = src[i];
+
 		for (ptrdiff_t j = 0; j < xdim; ++j) {
-			float val = src[i * src_stride_f + j];
+			float val = srcp[offset_x + j];
 
 			buf[i * xdim + j] = val;
 			sum += val;
@@ -384,9 +378,9 @@ inline FORCE_INLINE void wae5(const float *softmax, const float *elliott, unsign
 
 
 struct PredictorSSETraits {
-	static inline FORCE_INLINE void gather_input(const float *src, ptrdiff_t src_stride, ptrdiff_t xdim, ptrdiff_t ydim, float *buf, float mstd[4], double inv_size)
+	static inline FORCE_INLINE void gather_input(const float * const *src, ptrdiff_t offset_x, ptrdiff_t xdim, ptrdiff_t ydim, float *buf, float mstd[4], double inv_size)
 	{
-		gather_input_sse(src, src_stride, xdim, ydim, buf, mstd, inv_size);
+		gather_input_sse(src, offset_x, xdim, ydim, buf, mstd, inv_size);
 	}
 
 	static inline FORCE_INLINE void softmax_exp(float *ptr, unsigned n)

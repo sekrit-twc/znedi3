@@ -75,8 +75,8 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>ZNEDI3_X86;ZNEDI3_X86_AVX512;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;NOMINMAX;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..\znedi3</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>graphengine=graphengine_znedi3;ZNEDI3_X86;ZNEDI3_X86_AVX512;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;NOMINMAX;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\znedi3;$(ProjectDir)..\..\graphengine</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
   </ItemDefinitionGroup>
@@ -85,8 +85,8 @@
       <WarningLevel>Level3</WarningLevel>
       <Optimization>Disabled</Optimization>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>ZNEDI3_X86;ZNEDI3_X86_AVX512;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;NOMINMAX;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..\znedi3</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>graphengine=graphengine_znedi3;ZNEDI3_X86;ZNEDI3_X86_AVX512;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;NOMINMAX;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\znedi3;$(ProjectDir)..\..\graphengine</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
     </ClCompile>
   </ItemDefinitionGroup>
@@ -97,9 +97,10 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>ZNEDI3_X86;ZNEDI3_X86_AVX512;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;NOMINMAX;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..\znedi3</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>graphengine=graphengine_znedi3;ZNEDI3_X86;ZNEDI3_X86_AVX512;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;NOMINMAX;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\znedi3;$(ProjectDir)..\..\graphengine</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -113,9 +114,10 @@
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
       <SDLCheck>true</SDLCheck>
-      <PreprocessorDefinitions>ZNEDI3_X86;ZNEDI3_X86_AVX512;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;NOMINMAX;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
-      <AdditionalIncludeDirectories>$(ProjectDir)..\..\znedi3</AdditionalIncludeDirectories>
+      <PreprocessorDefinitions>graphengine=graphengine_znedi3;ZNEDI3_X86;ZNEDI3_X86_AVX512;_SCL_SECURE_NO_WARNINGS;_CRT_SECURE_NO_WARNINGS;NOMINMAX;WIN32_LEAN_AND_MEAN;%(PreprocessorDefinitions)</PreprocessorDefinitions>
+      <AdditionalIncludeDirectories>$(ProjectDir)..\..\znedi3;$(ProjectDir)..\..\graphengine</AdditionalIncludeDirectories>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
+      <BufferSecurityCheck>false</BufferSecurityCheck>
     </ClCompile>
     <Link>
       <EnableCOMDATFolding>true</EnableCOMDATFolding>
@@ -123,6 +125,13 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="..\..\graphengine\graphengine\cpuinfo.h" />
+    <ClInclude Include="..\..\graphengine\graphengine\filter.h" />
+    <ClInclude Include="..\..\graphengine\graphengine\graph.h" />
+    <ClInclude Include="..\..\graphengine\graphengine\node.h" />
+    <ClInclude Include="..\..\graphengine\graphengine\state.h" />
+    <ClInclude Include="..\..\graphengine\graphengine\types.h" />
+    <ClInclude Include="..\..\graphengine\graphengine\x86\cpuinfo_x86.h" />
     <ClInclude Include="..\..\znedi3\align.h" />
     <ClInclude Include="..\..\znedi3\alloc.h" />
     <ClInclude Include="..\..\znedi3\ccdep.h" />
@@ -137,6 +146,20 @@
     <ClInclude Include="..\..\znedi3\znedi3_impl.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="..\..\graphengine\graphengine\cpuinfo.cpp">
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(IntDir)graphengine_cpuinfo.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(IntDir)graphengine_cpuinfo.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(IntDir)graphengine_cpuinfo.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(IntDir)graphengine_cpuinfo.obj</ObjectFileName>
+    </ClCompile>
+    <ClCompile Include="..\..\graphengine\graphengine\graph.cpp" />
+    <ClCompile Include="..\..\graphengine\graphengine\node.cpp" />
+    <ClCompile Include="..\..\graphengine\graphengine\x86\cpuinfo_x86.cpp">
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Release|x64'">$(IntDir)graphengine_cpuinfo_x86.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">$(IntDir)graphengine_cpuinfo_x86.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">$(IntDir)graphengine_cpuinfo_x86.obj</ObjectFileName>
+      <ObjectFileName Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">$(IntDir)graphengine_cpuinfo_x86.obj</ObjectFileName>
+    </ClCompile>
     <ClCompile Include="..\..\znedi3\cpuinfo.cpp" />
     <ClCompile Include="..\..\znedi3\kernel.cpp" />
     <ClCompile Include="..\..\znedi3\weights.cpp" />

@@ -9,9 +9,9 @@
 
 namespace znedi3 {
 
-void cubic_interpolation_avx(const void *src, ptrdiff_t src_stride, void *dst, const unsigned char *prescreen, unsigned n)
+void cubic_interpolation_avx(const float * const src[4], float *dst, const unsigned char *prescreen, unsigned n)
 {
-	cubic_interpolation_avx_impl(src, src_stride, dst, prescreen, n);
+	cubic_interpolation_avx_impl(src, dst, prescreen, n);
 }
 
 

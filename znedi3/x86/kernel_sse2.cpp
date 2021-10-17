@@ -55,18 +55,18 @@ inline FORCE_INLINE __m128 mm_elliott_ps(__m128 x)
 	return _mm_mul_ps(x, mm_rcp24_ps(den));
 }
 
-inline FORCE_INLINE void gather_input_sse2(const float *src, ptrdiff_t src_stride, ptrdiff_t xdim, ptrdiff_t ydim, float *buf, float mstd[4], double inv_size)
+inline FORCE_INLINE void gather_input_sse2(const float * const *src, ptrdiff_t offset_x, ptrdiff_t xdim, ptrdiff_t ydim, float *buf, float mstd[4], double inv_size)
 {
-	ptrdiff_t src_stride_f = src_stride / sizeof(float);
-
 	__m128d sum0 = _mm_setzero_pd();
 	__m128d sum1 = _mm_setzero_pd();
 	__m128d sumsq0 = _mm_setzero_pd();
 	__m128d sumsq1 = _mm_setzero_pd();
 
 	for (ptrdiff_t i = 0; i < ydim; ++i) {
+		const float *srcp = src[i];
+
 		for (ptrdiff_t j = 0; j < xdim; j += 4) {
-			__m128 val = _mm_loadu_ps(src + j);
+			__m128 val = _mm_loadu_ps(srcp + offset_x + j);
 			__m128d vald0 = _mm_cvtps_pd(val);
 			__m128d vald1 = _mm_cvtps_pd(_mm_shuffle_ps(val, val, _MM_SHUFFLE(1, 0, 3, 2)));
 
@@ -77,7 +77,6 @@ inline FORCE_INLINE void gather_input_sse2(const float *src, ptrdiff_t src_strid
 
 			_mm_store_ps(buf + j, val);
 		}
-		src += src_stride_f;
 		buf += xdim;
 	}
 
@@ -157,9 +156,9 @@ inline FORCE_INLINE void wae5(const float *softmax, const float *elliott, unsign
 
 
 struct PredictorSSE2Traits {
-	static inline FORCE_INLINE void gather_input(const float *src, ptrdiff_t src_stride, ptrdiff_t xdim, ptrdiff_t ydim, float *buf, float mstd[4], double inv_size)
+	static inline FORCE_INLINE void gather_input(const float * const *src, ptrdiff_t offset_x, ptrdiff_t xdim, ptrdiff_t ydim, float *buf, float mstd[4], double inv_size)
 	{
-		gather_input_sse2(src, src_stride, xdim, ydim, buf, mstd, inv_size);
+		gather_input_sse2(src, offset_x, xdim, ydim, buf, mstd, inv_size);
 	}
 
 	static inline FORCE_INLINE void softmax_exp(float *ptr, unsigned n)
@@ -270,49 +269,33 @@ void float_to_word_sse2(const void *src, void *dst, size_t n)
 	}
 }
 
-void cubic_interpolation_sse2(const void *src, ptrdiff_t src_stride, void *dst, const unsigned char *prescreen, unsigned n)
+void cubic_interpolation_sse2(const float * const src[4], float *dst, const unsigned char *prescreen, unsigned n)
 {
-	const float *src_p = static_cast<const float *>(src);
-	float *dst_p = static_cast<float *>(dst);
-	ptrdiff_t src_stride_f = src_stride / sizeof(float);
-
-	const float *src_p0 = src_p - 2 * src_stride_f;
-	const float *src_p1 = src_p - 1 * src_stride_f;
-	const float *src_p2 = src_p + 0 * src_stride_f;
-	const float *src_p3 = src_p + 1 * src_stride_f;
+	const float *srcp0 = src[0];
+	const float *srcp1 = src[1];
+	const float *srcp2 = src[2];
+	const float *srcp3 = src[3];
 
 	const __m128 k0 = _mm_set_ps1(-3.0f / 32.0f);
 	const __m128 k1 = _mm_set_ps1(19.0f / 32.0f);
 
-	for (unsigned i = 0; i < n - n % 4; i += 4) {
+	for (unsigned i = 0; i < n; i += 4) {
 		__m128i mask = _mm_cvtsi32_si128(*(const uint32_t *)(prescreen + i));
 		mask = _mm_unpacklo_epi8(mask, mask);
 		mask = _mm_unpacklo_epi16(mask, mask);
 
-		__m128 orig = _mm_load_ps(dst_p + i);
+		__m128 orig = _mm_load_ps(dst + i);
 		orig = _mm_andnot_ps(_mm_castsi128_ps(mask), orig);
 
-		__m128 accum = _mm_mul_ps(k0, _mm_load_ps(src_p0 + i));
-		accum = _mm_add_ps(accum, _mm_mul_ps(k1, _mm_load_ps(src_p1 + i)));
-		accum = _mm_add_ps(accum, _mm_mul_ps(k1, _mm_load_ps(src_p2 + i)));
-		accum = _mm_add_ps(accum, _mm_mul_ps(k0, _mm_load_ps(src_p3 + i)));
+		__m128 accum = _mm_mul_ps(k0, _mm_load_ps(srcp0 + i));
+		accum = _mm_add_ps(accum, _mm_mul_ps(k1, _mm_load_ps(srcp1 + i)));
+		accum = _mm_add_ps(accum, _mm_mul_ps(k1, _mm_load_ps(srcp2 + i)));
+		accum = _mm_add_ps(accum, _mm_mul_ps(k0, _mm_load_ps(srcp3 + i)));
 
 		accum = _mm_and_ps(_mm_castsi128_ps(mask), accum);
 		accum = _mm_or_ps(orig, accum);
 
-		_mm_store_ps(dst_p + i, accum);
-	}
-	for (unsigned i = n - n % 4; i < n; ++i) {
-		if (!prescreen[i])
-			continue;
-
-		float accum = 0.0f;
-		accum += (-3.0f / 32.0f) * src_p0[i];
-		accum += (19.0f / 32.0f) * src_p1[i];
-		accum += (19.0f / 32.0f) * src_p2[i];
-		accum += (-3.0f / 32.0f) * src_p3[i];
-
-		dst_p[i] = accum;
+		_mm_store_ps(dst + i, accum);
 	}
 }
 

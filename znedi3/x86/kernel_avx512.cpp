@@ -109,12 +109,12 @@ inline FORCE_INLINE __m512 mm512_elliott_ps(__m512 x)
 	return _mm512_mul_ps(x, mm512_rcp24_ps(den));
 }
 
-inline FORCE_INLINE void prescreener_old_layer0_avx512(const float kernel[4][48], const float bias[4], const float *window, ptrdiff_t src_stride,
+inline FORCE_INLINE void prescreener_old_layer0_avx512(const float kernel[4][48], const float bias[4], const float * const src[4], ptrdiff_t offset_x,
                                                        float *activation, ptrdiff_t activation_stride, unsigned n)
 {
 	const ptrdiff_t activation_stride_f = activation_stride / sizeof(float);
 
-	for (unsigned i = 0; i < n; i += 16) {
+	for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(n); i += 16) {
 		_mm512_store_ps(activation + 0 * activation_stride_f + i, _mm512_setzero_ps());
 		_mm512_store_ps(activation + 1 * activation_stride_f + i, _mm512_setzero_ps());
 		_mm512_store_ps(activation + 2 * activation_stride_f + i, _mm512_setzero_ps());
@@ -122,10 +122,10 @@ inline FORCE_INLINE void prescreener_old_layer0_avx512(const float kernel[4][48]
 	}
 
 	// Compute 48x4 convolution.
-	for (unsigned k = 0; k < 4; ++k) {
-		const float *window_p = window + k * (src_stride / sizeof(float));
+	for (ptrdiff_t k = 0; k < 4; ++k) {
+		const float *window_p = src[k] + offset_x;
 
-		for (unsigned kk = 0; kk < 12; kk += 4) {
+		for (ptrdiff_t kk = 0; kk < 12; kk += 4) {
 			const __m512 n0_c0 = _mm512_set1_ps(kernel[0][12 * k + kk + 0]);
 			const __m512 n0_c1 = _mm512_set1_ps(kernel[0][12 * k + kk + 1]);
 			const __m512 n0_c2 = _mm512_set1_ps(kernel[0][12 * k + kk + 2]);
@@ -146,7 +146,7 @@ inline FORCE_INLINE void prescreener_old_layer0_avx512(const float kernel[4][48]
 			const __m512 n3_c2 = _mm512_set1_ps(kernel[3][12 * k + kk + 2]);
 			const __m512 n3_c3 = _mm512_set1_ps(kernel[3][12 * k + kk + 3]);
 
-			for (unsigned i = 0; i < n; i += 16) {
+			for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(n); i += 16) {
 				__m512 x0 = _mm512_loadu_ps(window_p + i + kk);
 				__m512 x4 = _mm512_loadu_ps(window_p + i + kk + 4);
 
@@ -434,26 +434,22 @@ public:
 		subtract_mean(m_data, half);
 	}
 
-	size_t get_tmp_size() const override
+	size_t get_tmp_size() const noexcept override
 	{
 		return 9 * 512 * sizeof(float);
 	}
 
-	void process(const void *src, ptrdiff_t src_stride, unsigned char *prescreen, void *tmp, unsigned n) const override
+	void process(const float * const src[4], unsigned char *prescreen, void *tmp, unsigned n) const noexcept override
 	{
 		float *activation = static_cast<float *>(tmp);
 		ptrdiff_t activation_stride = 512 * sizeof(float);
 
-		const float *src_p = static_cast<const float *>(src);
-		ptrdiff_t src_stride_f = src_stride / sizeof(float);
+		ptrdiff_t window_offset = 5;
 
-		// Adjust source pointer to point to top-left of filter window.
-		const float *window = src_p - 2 * src_stride_f - 5;
+		for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(n); i += 512) {
+			ptrdiff_t nn = i + 512 > static_cast<ptrdiff_t>(n) ? static_cast<ptrdiff_t>(n) - i : 512;
 
-		for (unsigned i = 0; i < n; i += 512) {
-			unsigned nn = i + 512 > n ? n - i : 512;
-
-			prescreener_old_layer0_avx512(m_data.kernel_l0, m_data.bias_l0, window + i, src_stride, activation, activation_stride, nn);
+			prescreener_old_layer0_avx512(m_data.kernel_l0, m_data.bias_l0, src, i - window_offset, activation, activation_stride, nn);
 			prescreener_old_layer1_avx512(m_data.kernel_l1, m_data.bias_l1, activation, activation_stride, nn);
 			prescreener_old_layer2_avx512(m_data.kernel_l2, m_data.bias_l2, activation, activation_stride, prescreen + i, nn);
 		}
@@ -470,15 +466,16 @@ public:
 		subtract_mean(m_data[0], half);
 	}
 
-	size_t get_tmp_size() const override { return 0; }
+	size_t get_tmp_size() const noexcept override { return 0; }
 
-	void process(const void *src, ptrdiff_t src_stride, unsigned char *prescreen, void *, unsigned n) const override
+	void process(const float * const src[4], unsigned char *prescreen, void *, unsigned n) const noexcept override
 	{
-		const float *src_p = static_cast<const float *>(src);
-		ptrdiff_t src_stride_f = src_stride / sizeof(float);
+		ptrdiff_t window_offset = 6;
 
-		// Adjust source pointer to point to top-left of filter window.
-		const float *window = src_p - 2 * src_stride_f - 6;
+		const float *srcp0 = src[0];
+		const float *srcp1 = src[1];
+		const float *srcp2 = src[2];
+		const float *srcp3 = src[3];
 
 		const __m512 l0_c00 = _mm512_load_ps(m_data[0].kernel_l0[0] + 0);
 		const __m512 l0_c01 = _mm512_load_ps(m_data[0].kernel_l0[0] + 16);
@@ -507,10 +504,10 @@ public:
 			__m512 tmp0, tmp1, tmp2, tmp3;
 
 			// Pixels [0-3].
-			x0 = _mm512_loadu_ps(window + 0 * src_stride_f + j + 0);
-			x1 = _mm512_loadu_ps(window + 1 * src_stride_f + j + 0);
-			x2 = _mm512_loadu_ps(window + 2 * src_stride_f + j + 0);
-			x3 = _mm512_loadu_ps(window + 3 * src_stride_f + j + 0);
+			x0 = _mm512_loadu_ps(srcp0 - window_offset + j + 0);
+			x1 = _mm512_loadu_ps(srcp1 - window_offset + j + 0);
+			x2 = _mm512_loadu_ps(srcp2 - window_offset + j + 0);
+			x3 = _mm512_loadu_ps(srcp3 - window_offset + j + 0);
 
 			tmp0 = _mm512_mul_ps(l0_c00, x0);
 			tmp0 = _mm512_fmadd_ps(l0_c01, x1, tmp0);
@@ -538,10 +535,10 @@ public:
 			partial0 = _mm512_add_ps(tmp0, tmp2);
 
 			// Pixels [4-7].
-			x0 = _mm512_loadu_ps(window + 0 * src_stride_f + j + 4);
-			x1 = _mm512_loadu_ps(window + 1 * src_stride_f + j + 4);
-			x2 = _mm512_loadu_ps(window + 2 * src_stride_f + j + 4);
-			x3 = _mm512_loadu_ps(window + 3 * src_stride_f + j + 4);
+			x0 = _mm512_loadu_ps(srcp0 - window_offset + j + 4);
+			x1 = _mm512_loadu_ps(srcp1 - window_offset + j + 4);
+			x2 = _mm512_loadu_ps(srcp2 - window_offset + j + 4);
+			x3 = _mm512_loadu_ps(srcp3 - window_offset + j + 4);
 
 			tmp0 = _mm512_mul_ps(l0_c00, x0);
 			tmp0 = _mm512_fmadd_ps(l0_c01, x1, tmp0);
@@ -569,10 +566,10 @@ public:
 			partial1 = _mm512_add_ps(tmp0, tmp2);
 
 			// Pixels [8-11].
-			x0 = _mm512_loadu_ps(window + 0 * src_stride_f + j + 8);
-			x1 = _mm512_loadu_ps(window + 1 * src_stride_f + j + 8);
-			x2 = _mm512_loadu_ps(window + 2 * src_stride_f + j + 8);
-			x3 = _mm512_loadu_ps(window + 3 * src_stride_f + j + 8);
+			x0 = _mm512_loadu_ps(srcp0 - window_offset + j + 8);
+			x1 = _mm512_loadu_ps(srcp1 - window_offset + j + 8);
+			x2 = _mm512_loadu_ps(srcp2 - window_offset + j + 8);
+			x3 = _mm512_loadu_ps(srcp3 - window_offset + j + 8);
 
 			tmp0 = _mm512_mul_ps(l0_c00, x0);
 			tmp0 = _mm512_fmadd_ps(l0_c01, x1, tmp0);
@@ -600,10 +597,10 @@ public:
 			partial2 = _mm512_add_ps(tmp0, tmp2);
 
 			// Pixels [12-15].
-			x0 = _mm512_loadu_ps(window + 0 * src_stride_f + j + 12);
-			x1 = _mm512_loadu_ps(window + 1 * src_stride_f + j + 12);
-			x2 = _mm512_loadu_ps(window + 2 * src_stride_f + j + 12);
-			x3 = _mm512_loadu_ps(window + 3 * src_stride_f + j + 12);
+			x0 = _mm512_loadu_ps(srcp0 - window_offset + j + 12);
+			x1 = _mm512_loadu_ps(srcp1 - window_offset + j + 12);
+			x2 = _mm512_loadu_ps(srcp2 - window_offset + j + 12);
+			x3 = _mm512_loadu_ps(srcp3 - window_offset + j + 12);
 
 			tmp0 = _mm512_mul_ps(l0_c00, x0);
 			tmp0 = _mm512_fmadd_ps(l0_c01, x1, tmp0);
@@ -659,19 +656,63 @@ public:
 };
 
 
-inline FORCE_INLINE void gather_pixels_avx512(const float *src, ptrdiff_t src_stride, ptrdiff_t xdim, ptrdiff_t ydim, float *buf, __m512d *partial_sum_sumsq)
+inline FORCE_INLINE void gather_pixels_avx512(const float * const *src, ptrdiff_t offset_x, ptrdiff_t xdim, ptrdiff_t ydim, float *buf, __m512d *partial_sum_sumsq)
 {
-	ptrdiff_t src_stride_f = src_stride / sizeof(float);
-
 	__m512d sum0 = _mm512_setzero_pd();
 	__m512d sum1 = _mm512_setzero_pd();
 	__m512d sumsq0 = _mm512_setzero_pd();
 	__m512d sumsq1 = _mm512_setzero_pd();
 
-	for (ptrdiff_t i = 0; i < ydim; i += 2) {
+	{
+		const float *srcp0 = src[0];
+		const float *srcp1 = src[1];
+		const float *srcp2 = src[2];
+		const float *srcp3 = src[3];
+
 		for (ptrdiff_t j = 0; j < xdim; j += 8) {
-			__m256 val0 = _mm256_loadu_ps(src + 0 * src_stride_f + j);
-			__m256 val1 = _mm256_loadu_ps(src + 1 * src_stride_f + j);
+			{
+				__m256 val0 = _mm256_loadu_ps(srcp0 + offset_x + j);
+				__m256 val1 = _mm256_loadu_ps(srcp1 + offset_x + j);
+
+				__m512d vald0 = _mm512_cvtps_pd(val0);
+				__m512d vald1 = _mm512_cvtps_pd(val1);
+
+				sum0 = _mm512_add_pd(sum0, vald0);
+				sum1 = _mm512_add_pd(sum1, vald1);
+
+				sumsq0 = _mm512_fmadd_pd(vald0, vald0, sumsq0);
+				sumsq1 = _mm512_fmadd_pd(vald1, vald1, sumsq1);
+
+				_mm256_store_ps(buf + 0 * xdim + j, val0);
+				_mm256_store_ps(buf + 1 * xdim + j, val1);
+			}
+			{
+				__m256 val0 = _mm256_loadu_ps(srcp2 + offset_x + j);
+				__m256 val1 = _mm256_loadu_ps(srcp3 + offset_x + j);
+
+				__m512d vald0 = _mm512_cvtps_pd(val0);
+				__m512d vald1 = _mm512_cvtps_pd(val1);
+
+				sum0 = _mm512_add_pd(sum0, vald0);
+				sum1 = _mm512_add_pd(sum1, vald1);
+
+				sumsq0 = _mm512_fmadd_pd(vald0, vald0, sumsq0);
+				sumsq1 = _mm512_fmadd_pd(vald1, vald1, sumsq1);
+
+				_mm256_store_ps(buf + 2 * xdim + j, val0);
+				_mm256_store_ps(buf + 3 * xdim + j, val1);
+			}
+		}
+		buf += 4 * xdim;
+	}
+
+	if (ydim > 4) {
+		const float *srcp0 = src[4];
+		const float *srcp1 = src[5];
+
+		for (ptrdiff_t j = 0; j < xdim; j += 8) {
+			__m256 val0 = _mm256_loadu_ps(srcp0 + offset_x + j);
+			__m256 val1 = _mm256_loadu_ps(srcp1 + offset_x + j);
 
 			__m512d vald0 = _mm512_cvtps_pd(val0);
 			__m512d vald1 = _mm512_cvtps_pd(val1);
@@ -685,7 +726,6 @@ inline FORCE_INLINE void gather_pixels_avx512(const float *src, ptrdiff_t src_st
 			_mm256_store_ps(buf + 0 * xdim + j, val0);
 			_mm256_store_ps(buf + 1 * xdim + j, val1);
 		}
-		src += 2 * src_stride_f;
 		buf += 2 * xdim;
 	}
 
@@ -991,7 +1031,7 @@ public:
 		assert(model.first.xdim * model.first.ydim <= 48 * 6);
 	}
 
-	size_t get_tmp_size() const override
+	size_t get_tmp_size() const noexcept override
 	{
 		FakeAllocator alloc;
 
@@ -1002,17 +1042,13 @@ public:
 		return alloc.count();
 	}
 
-	void process(const void *src, ptrdiff_t src_stride, void *dst, const unsigned char *prescreen, void *tmp, unsigned n) const override
+	void process(const float * const src[6], float *dst, const unsigned char *prescreen, void *tmp, unsigned n) const noexcept override
 	{
 		LinearAllocator alloc{ tmp };
 
-		const float *src_p = static_cast<const float *>(src);
-		float *dst_p = static_cast<float *>(dst);
-		ptrdiff_t src_stride_f = src_stride / sizeof(float);
-
-		// Adjust source pointer to point to top-left of filter window.
-		const float *window = src_p - static_cast<ptrdiff_t>(m_model.ydim / 2) * src_stride_f - (m_model.xdim / 2 - 1);
-		unsigned filter_size = m_model.xdim * m_model.ydim;
+		ptrdiff_t window_offset_y = 3 - (m_model.ydim / 2);
+		ptrdiff_t window_offset_x = static_cast<size_t>(m_model.xdim) / 2 - 1;
+		size_t filter_size = static_cast<size_t>(m_model.xdim) * m_model.ydim;
 
 		float *input = alloc.allocate_n<float>(48 * 6 * 4);
 		float *activation = alloc.allocate_n<float>(256 * 2 * 4);
@@ -1020,23 +1056,23 @@ public:
 
 		__m512d partial_sum_sumsq[8];
 		unsigned gathered_idx[4];
-		unsigned num_gathered = 0;
+		size_t num_gathered = 0;
 
-		for (unsigned i = 0; i < n; ++i) {
+		for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(n); ++i) {
 			if (prescreen[i])
 				continue;
 
-			gather_pixels_avx512(window + i, src_stride, m_model.xdim, m_model.ydim, input + num_gathered * filter_size, partial_sum_sumsq + num_gathered * 2);
+			gather_pixels_avx512(src + window_offset_y, i - window_offset_x, m_model.xdim, m_model.ydim, input + num_gathered * filter_size, partial_sum_sumsq + num_gathered * 2);
 			gathered_idx[num_gathered] = i;
 			++num_gathered;
 
 			if (num_gathered == 4) {
 				apply_model(input, activation, mstd, partial_sum_sumsq);
 
-				dst_p[gathered_idx[0]] = mstd[3 * 4 + 0];
-				dst_p[gathered_idx[1]] = mstd[3 * 4 + 1];
-				dst_p[gathered_idx[2]] = mstd[3 * 4 + 2];
-				dst_p[gathered_idx[3]] = mstd[3 * 4 + 3];
+				dst[gathered_idx[0]] = mstd[3 * 4 + 0];
+				dst[gathered_idx[1]] = mstd[3 * 4 + 1];
+				dst[gathered_idx[2]] = mstd[3 * 4 + 2];
+				dst[gathered_idx[3]] = mstd[3 * 4 + 3];
 
 				num_gathered = 0;
 			}
@@ -1044,8 +1080,8 @@ public:
 		if (num_gathered) {
 			apply_model(input, activation, mstd, partial_sum_sumsq);
 
-			for (unsigned idx = 0; idx < num_gathered; ++idx) {
-				dst_p[gathered_idx[idx]] = mstd[3 * 4 + idx];
+			for (ptrdiff_t idx = 0; idx < num_gathered; ++idx) {
+				dst[gathered_idx[idx]] = mstd[3 * 4 + idx];
 			}
 		}
 	}
@@ -1054,41 +1090,26 @@ public:
 } // namespace
 
 
-void cubic_interpolation_avx512f(const void *src, ptrdiff_t src_stride, void *dst, const unsigned char *prescreen, unsigned n)
+void cubic_interpolation_avx512f(const float * const src[4], float *dst, const unsigned char *prescreen, unsigned n)
 {
-	const float *src_p = static_cast<const float *>(src);
-	float *dst_p = static_cast<float *>(dst);
-	ptrdiff_t src_stride_f = src_stride / sizeof(float);
-
-	const float *src_p0 = src_p - 2 * src_stride_f;
-	const float *src_p1 = src_p - 1 * src_stride_f;
-	const float *src_p2 = src_p + 0 * src_stride_f;
-	const float *src_p3 = src_p + 1 * src_stride_f;
+	const float *srcp0 = src[0];
+	const float *srcp1 = src[1];
+	const float *srcp2 = src[2];
+	const float *srcp3 = src[3];
 
 	const __m512 k0 = _mm512_set1_ps(-3.0f / 32.0f);
 	const __m512 k1 = _mm512_set1_ps(19.0f / 32.0f);
 
-	for (unsigned i = 0; i < n - n % 16; i += 16) {
+	for (unsigned i = 0; i < n; i += 16) {
 		__m512i pmask = _mm512_cvtepi8_epi32(_mm_load_si128((const __m128i *)(prescreen + i)));
 		__mmask16 mask = _mm512_cmp_epi32_mask(pmask, _mm512_setzero_si512(), _MM_CMPINT_NE);
 
-		__m512 accum = _mm512_maskz_mul_ps(mask, k0, _mm512_load_ps(src_p0 + i));
-		accum = _mm512_maskz_fmadd_ps(mask, k1, _mm512_load_ps(src_p1 + i), accum);
-		accum = _mm512_maskz_fmadd_ps(mask, k1, _mm512_load_ps(src_p2 + i), accum);
-		accum = _mm512_maskz_fmadd_ps(mask, k0, _mm512_load_ps(src_p3 + i), accum);
+		__m512 accum = _mm512_maskz_mul_ps(mask, k0, _mm512_load_ps(srcp0 + i));
+		accum = _mm512_maskz_fmadd_ps(mask, k1, _mm512_load_ps(srcp1 + i), accum);
+		accum = _mm512_maskz_fmadd_ps(mask, k1, _mm512_load_ps(srcp2 + i), accum);
+		accum = _mm512_maskz_fmadd_ps(mask, k0, _mm512_load_ps(srcp3 + i), accum);
 
-		_mm512_mask_store_ps(dst_p + i, mask, accum);
-	}
-	if (n % 16) {
-		__m512i pmask = _mm512_cvtepi8_epi32(_mm_load_si128((const __m128i *)(prescreen + (n - n % 16))));
-		__mmask16 mask = _mm512_cmp_epi32_mask(pmask, _mm512_setzero_si512(), _MM_CMPINT_NE) & (UINT16_MAX >> (16 - n % 16));
-
-		__m512 accum = _mm512_maskz_mul_ps(mask, k0, _mm512_load_ps(src_p0 + (n - n % 16)));
-		accum = _mm512_maskz_fmadd_ps(mask, k1, _mm512_load_ps(src_p1 + (n - n % 16)), accum);
-		accum = _mm512_maskz_fmadd_ps(mask, k1, _mm512_load_ps(src_p2 + (n - n % 16)), accum);
-		accum = _mm512_maskz_fmadd_ps(mask, k0, _mm512_load_ps(src_p3 + (n - n % 16)), accum);
-
-		_mm512_mask_store_ps(dst_p + (n - n % 16), mask, accum);
+		_mm512_mask_store_ps(dst + i, mask, accum);
 	}
 }
 

@@ -1,8 +1,23 @@
 MY_CFLAGS := -O2 -fPIC $(CFLAGS)
 MY_CXXFLAGS := -std=c++14 -O2 -fPIC $(CXXFLAGS)
-MY_CPPFLAGS := -Iznedi3 -Ivsxx $(CPPFLAGS)
+MY_CPPFLAGS := -Dgraphengine=graphengine_znedi3 -Igraphengine -Iznedi3 -Ivsxx -Ivsxx/VapourSynth $(CPPFLAGS)
 MY_LDFLAGS := $(LDFLAGS)
 MY_LIBS := $(LIBS)
+
+graphengine_HDRS = \
+	graphengine/graphengine/cpuinfo.h \
+	graphengine/graphengine/filter.h \
+	graphengine/graphengine/graph.h \
+	graphengine/graphengine/node.h \
+	graphengine/graphengine/state.h \
+	graphengine/graphengine/types.h \
+	graphengine/graphengine/x86/cpuinfo_x86.h
+
+graphengine_OBJS = \
+	graphengine/graphengine/cpuinfo.o \
+	graphengine/graphengine/graph.o \
+	graphengine/graphengine/node.o \
+	graphengine/graphengine/x86/cpuinfo_x86.o
 
 znedi3_HDRS = \
 	znedi3/align.h \
@@ -69,16 +84,16 @@ endif
 
 all: vsznedi3.so
 
-testapp/testapp: $(testapp_OBJS) $(znedi3_OBJS)
+testapp/testapp: $(testapp_OBJS) $(znedi3_OBJS) $(graphengine_OBJS)
 	$(CXX) $(MY_LDFLAGS) $^ $(MY_LIBS) -o $@
 
-vsznedi3.so: vsznedi3/vsznedi3.o vsxx/vsxx_pluginmain.o $(znedi3_OBJS)
+vsznedi3.so: vsznedi3/vsznedi3.o vsxx/vsxx_pluginmain.o $(znedi3_OBJS) $(graphengine_OBJS)
 	$(CXX) -shared $(MY_LDFLAGS) $^ $(MY_LIBS) -o $@
 
 clean:
-	rm -f *.a *.o *.so testapp/testapp testapp/*.o znedi3/*.o znedi3/x86/*.o vsznedi3/*.o vsxx/*.o
+	rm -f *.a *.o *.so graphengine/graphengine/*.o testapp/testapp testapp/*.o znedi3/*.o znedi3/x86/*.o vsznedi3/*.o vsxx/*.o
 
-%.o: %.cpp $(znedi3_HDRS) $(testapp_HDRS) $(vsxx_HDRS)
+%.o: %.cpp $(graphengine_HDRS) $(znedi3_HDRS) $(testapp_HDRS) $(vsxx_HDRS)
 	$(CXX) -c $(EXTRA_CXXFLAGS) $(MY_CXXFLAGS) $(MY_CPPFLAGS) $< -o $@
 
 .PHONY: clean

@@ -180,24 +180,18 @@ constexpr ArgparseCommandLine program_cmd = {
 
 void execute(const Arguments &args, const znedi3_filter *filter, const PlanarImage &in, PlanarImage &out)
 {
-	std::shared_ptr<void> tmp(aligned_malloc(znedi3_filter_get_tmp_size(filter, in.width[0], in.height[0] / 2), 64), aligned_free);
+	std::shared_ptr<void> tmp(aligned_malloc(znedi3_filter_get_tmp_size(filter), 64), aligned_free);
 
 	std::pair<double, double> results = measure_benchmark(args.times, [&]()
 	{
 		for (unsigned p = 0; p < 3; ++p) {
 			// Interpolate top field.
-			if (args.top) {
-				znedi3_filter_process(filter, out.width[p], out.height[p] / 2,
-				                      in.data[p].data() + in.stride[p], in.stride[p] * 2, out.data[p].data(), out.stride[p] * 2,
-				                      tmp.get(), 0);
-			}
+			if (args.top)
+				znedi3_filter_process(filter, in.data[p].data() + in.stride[p], in.stride[p] * 2, out.data[p].data(), out.stride[p] * 2, tmp.get(), 0);
 
 			// Interpolate bottom field.
-			if (args.bottom) {
-				znedi3_filter_process(filter, out.width[p], out.height[p] / 2,
-				                      in.data[p].data(), in.stride[p] * 2, out.data[p].data() + out.stride[p], out.stride[p] * 2,
-				                      tmp.get(), 1);
-			}
+			if (args.bottom)
+				znedi3_filter_process(filter, in.data[p].data(), in.stride[p] * 2, out.data[p].data() + out.stride[p], out.stride[p] * 2, tmp.get(), 1);
 		}
 	});
 
@@ -243,11 +237,11 @@ int main(int argc, char **argv)
 		propagate_if_set(params.cpu, args.cpu);
 		propagate_if_set(params.show_mask, args.show_mask);
 
-		std::unique_ptr<znedi3_filter, FreeFilter> filter{ znedi3_filter_create(weights.get(), &params) };
+		WindowsBitmap in{ args.input, WindowsBitmap::READ_TAG };
+
+		std::unique_ptr<znedi3_filter, FreeFilter> filter{ znedi3_filter_create(weights.get(), &params, in.width(), in.height() / 2) };
 		if (!filter)
 			throw std::runtime_error{ "error creating filter" };
-
-		WindowsBitmap in{ args.input, WindowsBitmap::READ_TAG };
 
 		PlanarImage in_planar{};
 		bitmap_to_planar(in, in_planar);

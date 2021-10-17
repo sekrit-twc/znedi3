@@ -65,25 +65,19 @@ float softmax_exp(float x)
 	return std::exp(std::min(std::max(x, -80.0f), 80.0f));
 }
 
-void cubic_interpolation_c(const void *src, ptrdiff_t src_stride, void *dst, const unsigned char *prescreen, unsigned n)
+void cubic_interpolation_c(const float * const src[4], float *dst, const unsigned char *prescreen, unsigned n)
 {
-	const float *src_p = static_cast<const float *>(src);
-	float *dst_p = static_cast<float *>(dst);
-	ptrdiff_t src_stride_f = src_stride / sizeof(float);
-
-	const float *window = src_p - 2 * src_stride_f;
-
 	for (unsigned i = 0; i < n; ++i) {
 		if (!prescreen[i])
 			continue;
 
 		float accum = 0.0f;
-		accum += (-3.0f / 32.0f) * window[0 * src_stride_f + i];
-		accum += (19.0f / 32.0f) * window[1 * src_stride_f + i];
-		accum += (19.0f / 32.0f) * window[2 * src_stride_f + i];
-		accum += (-3.0f / 32.0f) * window[3 * src_stride_f + i];
+		accum += (-3.0f / 32.0f) * src[0][i];
+		accum += (19.0f / 32.0f) * src[1][i];
+		accum += (19.0f / 32.0f) * src[2][i];
+		accum += (-3.0f / 32.0f) * src[3][i];
 
-		dst_p[i] = accum;
+		dst[i] = accum;
 	}
 }
 
@@ -97,22 +91,18 @@ public:
 		subtract_mean(m_data, half);
 	}
 
-	size_t get_tmp_size() const override { return 0; }
+	size_t get_tmp_size() const noexcept override { return 0; }
 
-	void process(const void *src, ptrdiff_t src_stride, unsigned char *prescreen, void *, unsigned n) const override
+	void process(const float * const src[4], unsigned char *prescreen, void *, unsigned n) const noexcept override
 	{
-		const float *src_p = static_cast<const float *>(src);
-		ptrdiff_t src_stride_f = src_stride / sizeof(float);
+		ptrdiff_t window_offset = 5;
 
-		// Adjust source pointer to point to top-left of filter window.
-		const float *window = src_p - 2 * src_stride_f - 5;
-
-		for (unsigned j = 0; j < n; ++j) {
+		for (ptrdiff_t j = 0; j < static_cast<ptrdiff_t>(n); ++j) {
 			float input[48];
 			float state[12];
 
 			for (unsigned i = 0; i < 4; ++i) {
-				std::copy_n(window + i * src_stride_f + j, 12, input + i * 12);
+				std::copy_n(src[i] - window_offset + j, 12, input + i * 12);
 			}
 
 			// Layer 0.
@@ -156,22 +146,18 @@ public:
 		subtract_mean(m_data, half);
 	}
 
-	size_t get_tmp_size() const override { return 0; }
+	size_t get_tmp_size() const noexcept override { return 0; }
 
-	void process(const void *src, ptrdiff_t src_stride, unsigned char *prescreen, void *, unsigned n) const override
+	void process(const float * const src[4], unsigned char *prescreen, void *, unsigned n) const noexcept override
 	{
-		const float *src_p = static_cast<const float *>(src);
-		ptrdiff_t src_stride_f = src_stride / sizeof(float);
+		ptrdiff_t window_offset = 6;
 
-		// Adjust source pointer to point to top-left of filter window.
-		const float *window = src_p - 2 * src_stride_f - 6;
-
-		for (unsigned j = 0; j < n; j += 4) {
+		for (ptrdiff_t j = 0; j < static_cast<ptrdiff_t>(n); j += 4) {
 			float input[64];
 			float state[8];
 
 			for (unsigned i = 0; i < 4; ++i) {
-				std::copy_n(window + i * src_stride_f + j, 16, input + i * 16);
+				std::copy_n(src[i] - window_offset + j, 16, input + i * 16);
 			}
 
 			for (unsigned n = 0; n < 4; ++n) {
@@ -202,16 +188,14 @@ class PredictorC final : public Predictor {
 	const float *softmax_q2_filter(unsigned nn) const { return m_model.second.softmax_q2 + filter_offset(nn); }
 	const float *elliott_q2_filter(unsigned nn) const { return m_model.second.elliott_q2 + filter_offset(nn); }
 
-	void gather_input(const float *src, ptrdiff_t src_stride, float *buf, float mstd[4]) const
+	void gather_input(const float * const *src, ptrdiff_t window_offset, float *buf, float mstd[4]) const
 	{
-		ptrdiff_t src_stride_f = src_stride / sizeof(float);
-
 		double sum = 0;
 		double sum_sq = 0;
 
-		for (unsigned i = 0; i < m_model.first.ydim; ++i) {
-			for (unsigned j = 0; j < m_model.first.xdim; ++j) {
-				float val = src[i * src_stride_f + j];
+		for (ptrdiff_t i = 0; i < m_model.first.ydim; ++i) {
+			for (ptrdiff_t j = 0; j < m_model.first.xdim; ++j) {
+				float val = src[i][window_offset + j];
 
 				buf[i * m_model.first.xdim + j] = val;
 				sum += val;
@@ -256,20 +240,17 @@ public:
 		subtract_mean(m_model);
 	}
 
-	size_t get_tmp_size() const override { return 0; }
+	size_t get_tmp_size() const noexcept override { return 0; }
 
-	void process(const void *src, ptrdiff_t src_stride, void *dst, const unsigned char *prescreen, void *, unsigned n) const override
+	void process(const float * const *src, float *dst, const unsigned char *prescreen, void *, unsigned n) const noexcept override
 	{
-		const float *src_p = static_cast<const float *>(src);
-		float *dst_p = static_cast<float *>(dst);
-		ptrdiff_t src_stride_f = src_stride / sizeof(float);
+		ptrdiff_t window_offset_y = 3 - static_cast<ptrdiff_t>(m_model.first.ydim / 2);
+		ptrdiff_t window_offset_x = m_model.first.xdim / 2 - 1;
 
-		// Adjust source pointer to point to top-left of filter window.
-		const float *window = src_p - static_cast<ptrdiff_t>(m_model.first.ydim / 2) * src_stride_f - (m_model.first.xdim / 2 - 1);
 		unsigned filter_size = m_model.first.xdim * m_model.first.ydim;
 		unsigned nns = m_model.first.nns;
 
-		for (unsigned i = 0; i < n; ++i) {
+		for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(n); ++i) {
 			if (prescreen[i])
 				continue;
 
@@ -277,7 +258,7 @@ public:
 			float activation[256 * 2];
 			float mstd[4];
 
-			gather_input(window + i, src_stride, input, mstd);
+			gather_input(src + window_offset_y, i - window_offset_x, input, mstd);
 			float scale = mstd[2];
 
 			for (unsigned nn = 0; nn < nns; ++nn) {
@@ -302,7 +283,7 @@ public:
 				wae5(activation, activation + nns, nns, mstd);
 			}
 
-			dst_p[i] = mstd[3] / (m_use_q2 ? 2 : 1);
+			dst[i] = mstd[3] / (m_use_q2 ? 2 : 1);
 		}
 	}
 };

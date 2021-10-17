@@ -4,6 +4,7 @@
 #define ZNEDI3_KERNEL_H_
 
 #include <cstddef>
+#include <cstdint>
 #include <memory>
 #include <utility>
 #include "weights.h"
@@ -14,24 +15,24 @@ enum class CPUClass;
 enum class PixelType;
 
 typedef void (*pixel_io_func)(const void *src, void *dst, size_t n);
-typedef void (*interpolate_func)(const void *src, ptrdiff_t src_stride, void *dst, const unsigned char *prescreen, unsigned n);
+typedef void (*interpolate_func)(const float * const src[4], float *dst, const uint8_t *prescreen, unsigned n);
 
 class Prescreener {
 public:
 	virtual ~Prescreener() = default;
 
-	virtual size_t get_tmp_size() const = 0;
+	virtual size_t get_tmp_size() const noexcept = 0;
 
-	virtual void process(const void *src, ptrdiff_t src_stride, unsigned char *prescreen, void *tmp, unsigned n) const = 0;
+	virtual void process(const float * const src[4], uint8_t *prescreen, void *tmp, unsigned n) const noexcept = 0;
 };
 
 class Predictor {
 public:
 	virtual ~Predictor() = default;
 
-	virtual size_t get_tmp_size() const = 0;
+	virtual size_t get_tmp_size() const noexcept = 0;
 
-	virtual void process(const void *src, ptrdiff_t src_stride, void *dst, const unsigned char *prescreen, void *tmp, unsigned n) const = 0;
+	virtual void process(const float * const src[6], float *dst, const uint8_t *prescreen, void *tmp, unsigned n) const noexcept = 0;
 };
 
 pixel_io_func select_pixel_io_func(PixelType in, PixelType out, CPUClass cpu);

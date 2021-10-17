@@ -113,10 +113,10 @@ void znedi3_filter_params_default(znedi3_filter_params *params)
 	params->show_mask = 0;
 }
 
-znedi3_filter *znedi3_filter_create(const znedi3_weights *weights, const znedi3_filter_params *params) try
+znedi3_filter *znedi3_filter_create(const znedi3_weights *weights, const znedi3_filter_params *params, unsigned width, unsigned height) try
 {
 	const znedi3::NNEDI3Weights *nnedi3 = static_cast<const znedi3::NNEDI3Weights *>(weights);
-	std::unique_ptr<znedi3::znedi3_filter> filter = std::make_unique<znedi3::znedi3_filter>(*nnedi3, *params);
+	std::unique_ptr<znedi3::znedi3_filter> filter = std::make_unique<znedi3::znedi3_filter>(*nnedi3, *params, width, height);
 	return filter.release();
 } catch (...) {
 	return nullptr;
@@ -127,13 +127,12 @@ void znedi3_filter_free(znedi3_filter *ptr)
 	delete static_cast<znedi3::znedi3_filter *>(ptr);
 }
 
-size_t znedi3_filter_get_tmp_size(const znedi3_filter *ptr, unsigned width, unsigned height)
+size_t znedi3_filter_get_tmp_size(const znedi3_filter *ptr)
 {
-	return static_cast<const znedi3::znedi3_filter *>(ptr)->get_tmp_size(width, height);
+	return static_cast<const znedi3::znedi3_filter *>(ptr)->get_tmp_size();
 }
 
-void znedi3_filter_process(const znedi3_filter *ptr, unsigned width, unsigned height,
-                           const void *src, ptrdiff_t src_stride, void *dst, ptrdiff_t dst_stride, void *tmp, unsigned parity)
+void znedi3_filter_process(const znedi3_filter *ptr, const void *src, ptrdiff_t src_stride, void *dst, ptrdiff_t dst_stride, void *tmp, int parity)
 {
-	static_cast<const znedi3::znedi3_filter *>(ptr)->process(width, height, src, src_stride, dst, dst_stride, tmp, parity);
+	static_cast<const znedi3::znedi3_filter *>(ptr)->process(src, src_stride, dst, dst_stride, tmp, parity);
 }

@@ -60,6 +60,7 @@ void override_cpu_type(znedi3_cpu_type_e &dst, const std::string &str)
 
 class VSZNEDI3 : public vsxx::FilterBase {
 	std::unique_ptr<znedi3_filter, ZNEDI3FilterFree> m_nnedi3;
+	std::unique_ptr<znedi3_filter, ZNEDI3FilterFree> m_nnedi3_chroma;
 	std::vector<std::pair<size_t, VideoFrame>> m_cache;
 	std::mutex m_cache_mutex;
 	FilterNode m_clip;
@@ -196,9 +197,15 @@ public:
 		propagate_if_set(nnedi3_params.slow_exp, in.get_prop<int>("exp", map::default_val(-1)));
 		propagate_if_set(nnedi3_params.show_mask, in.get_prop<int>("show_mask", map::default_val(-1)));
 
-		m_nnedi3.reset(znedi3_filter_create(nnedi3_weights.get(), &nnedi3_params));
+		m_nnedi3.reset(znedi3_filter_create(nnedi3_weights.get(), &nnedi3_params, m_vi.width, m_vi.height / 2));
 		if (!m_nnedi3)
 			throw std::runtime_error{ "failed to create nnedi3" };
+
+		if (m_vi.format->colorFamily == cmYUV || m_vi.format->colorFamily == cmYCoCg) {
+			m_nnedi3_chroma.reset(znedi3_filter_create(nnedi3_weights.get(), &nnedi3_params, m_vi.width >> m_vi.format->subSamplingW, (m_vi.height / 2) >> m_vi.format->subSamplingH));
+			if (!m_nnedi3_chroma)
+				throw std::runtime_error{ "failed to create nnedi3" };
+		}
 
 		return{ fmParallel, 0 };
 	}
@@ -247,7 +254,9 @@ public:
 			uint8_t *dst_field_p = dst_p + static_cast<int>(!src_parity) * dst_stride;
 			int dst_field_stride = dst_stride * 2;
 
-			size_t tmp_size = znedi3_filter_get_tmp_size(m_nnedi3.get(), width, height);
+			znedi3_filter *nnedi3 = (p > 0 && (m_vi.format->colorFamily == cmYUV || m_vi.format->colorFamily == cmYCoCg)) ? m_nnedi3_chroma.get() : m_nnedi3.get();
+
+			size_t tmp_size = znedi3_filter_get_tmp_size(nnedi3);
 			if (tmp_size > tmp_buffer.first) {
 				std::pair<size_t, VideoFrame> buffer{};
 
@@ -269,7 +278,7 @@ public:
 				tmp = tmp_buffer.second.write_ptr(0);
 			}
 
-			znedi3_filter_process(m_nnedi3.get(), width, height, src_field_p, src_field_stride, dst_field_p, dst_field_stride, tmp, !src_parity);
+			znedi3_filter_process(nnedi3, src_field_p, src_field_stride, dst_field_p, dst_field_stride, tmp, !src_parity);
 
 			uint8_t *dst_other_field_p = dst_p + static_cast<int>(src_parity) * dst_stride;
 			vs_bitblt(dst_other_field_p, dst_field_stride, src_field_p, src_field_stride, rowsize, height);
