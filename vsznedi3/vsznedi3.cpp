@@ -6,9 +6,11 @@
 #include <utility>
 #include <vector>
 #include <znedi3.h>
-#include "vsxx_pluginmain.h"
 
-using namespace vsxx;
+#include <VSHelper4.h>
+#include "vsxx4_pluginmain.h"
+
+using namespace vsxx4;
 
 namespace {
 
@@ -58,16 +60,14 @@ void override_cpu_type(znedi3_cpu_type_e &dst, const std::string &str)
 } // namespace
 
 
-class VSZNEDI3 : public vsxx::FilterBase {
+class VSZNEDI3 : public vsxx4::FilterBase {
 	std::unique_ptr<znedi3_filter, ZNEDI3FilterFree> m_nnedi3;
 	std::unique_ptr<znedi3_filter, ZNEDI3FilterFree> m_nnedi3_chroma;
-	std::vector<std::pair<size_t, VideoFrame>> m_cache;
-	std::mutex m_cache_mutex;
 	FilterNode m_clip;
-	VSVideoInfo m_vi;
-	FieldOperation m_mode;
-	bool m_dh;
-	bool m_planes[3];
+	VSVideoInfo m_vi{};
+	FieldOperation m_mode{};
+	bool m_dh = false;
+	bool m_planes[3] = { true, true, true };
 
 	int get_src_frameno(int n) const
 	{
@@ -77,9 +77,9 @@ class VSZNEDI3 : public vsxx::FilterBase {
 			return n;
 	}
 
-	unsigned get_src_parity(const ConstVideoFrame &src, int n) const
+	unsigned get_src_parity(const ConstFrame &src, int n) const
 	{
-		const ConstPropertyMap &props = src.frame_props_ro();
+		const ConstMap &props = src.frame_props_ro();
 		unsigned default_parity = (m_mode == FieldOperation::KEEP_BOTTOM || m_mode == FieldOperation::BOB_BOTTOM_FIRST) ? 1 : 0;
 
 		if (m_dh) {
@@ -95,19 +95,13 @@ class VSZNEDI3 : public vsxx::FilterBase {
 		}
 	}
 public:
-	explicit VSZNEDI3(void *) :
-		m_vi{},
-		m_mode{},
-		m_dh{},
-		m_planes{ true, true, true }
-	{}
+	explicit VSZNEDI3(void *) {}
 
-	const char *get_name(int) noexcept override { return "znedi3"; }
+	const char *get_name(void *) noexcept override { return "znedi3"; }
 
-	std::pair<::VSFilterMode, int> init(const ConstPropertyMap &in, const PropertyMap &out, const VapourCore &core) override
+	void init(const ConstMap &in, const Map &out, const Core &core) override
 	{
-		Plugin this_plugin{ get_vsapi()->getPluginById(PLUGIN_ID, core.get()) };
-		std::string plugin_path = this_plugin.path();
+		std::string plugin_path = core.get_plugin_by_id(PLUGIN_ID).path();
 
 		std::string weights_path;
 #ifdef NNEDI3_WEIGHTS_PATH
@@ -125,8 +119,8 @@ public:
 		m_clip = in.get_prop<FilterNode>("clip");
 		m_vi = m_clip.video_info();
 
-		if (!m_vi.format)
-			throw std::runtime_error{ "clip must have a constant format" };
+		if (!vsh::isConstantVideoFormat(&m_vi))
+			throw std::runtime_error{ "clip must have constant format" };
 
 		m_mode = static_cast<FieldOperation>(in.get_prop<int>("field"));
 		if (m_mode < FieldOperation::KEEP_BOTTOM || m_mode > FieldOperation::BOB_TOP_FIRST)
@@ -135,13 +129,13 @@ public:
 		m_dh = in.get_prop<bool>("dh", map::default_val(false));
 		if (m_dh)
 			m_vi.height *= 2;
-		else if (m_vi.height % 2 || (m_vi.height >> m_vi.format->subSamplingH) % 2)
+		else if (m_vi.height % 2 || (m_vi.height >> m_vi.format.subSamplingH) % 2)
 			throw std::runtime_error{ "clip must have even number of scanlines" };
 
 		if ((m_mode == FieldOperation::BOB_BOTTOM_FIRST || m_mode == FieldOperation::BOB_TOP_FIRST) && !m_dh) {
-			m_vi.numFrames = int64ToIntS(m_vi.numFrames * 2LL);
+			m_vi.numFrames = vsh::int64ToIntS(m_vi.numFrames * 2LL);
 			m_vi.fpsNum *= 2;
-			muldivRational(&m_vi.fpsNum, &m_vi.fpsDen, 1, 1);
+			vsh::muldivRational(&m_vi.fpsNum, &m_vi.fpsDen, 1, 1);
 		}
 
 		if (in.contains("planes")) {
@@ -165,18 +159,18 @@ public:
 		znedi3_filter_params_default(&nnedi3_params);
 		nnedi3_params.cpu = ZNEDI3_CPU_AUTO_64B;
 
-		if (m_vi.format->sampleType == stInteger && m_vi.format->bytesPerSample == 1)
+		if (m_vi.format.sampleType == stInteger && m_vi.format.bytesPerSample == 1)
 			nnedi3_params.pixel_type = ZNEDI3_PIXEL_BYTE;
-		else if (m_vi.format->sampleType == stInteger && m_vi.format->bytesPerSample == 2)
+		else if (m_vi.format.sampleType == stInteger && m_vi.format.bytesPerSample == 2)
 			nnedi3_params.pixel_type = ZNEDI3_PIXEL_WORD;
-		else if (m_vi.format->sampleType == stFloat && m_vi.format->bytesPerSample == 2)
+		else if (m_vi.format.sampleType == stFloat && m_vi.format.bytesPerSample == 2)
 			nnedi3_params.pixel_type = ZNEDI3_PIXEL_HALF;
-		else if (m_vi.format->sampleType == stFloat && m_vi.format->bytesPerSample == 4)
+		else if (m_vi.format.sampleType == stFloat && m_vi.format.bytesPerSample == 4)
 			nnedi3_params.pixel_type = ZNEDI3_PIXEL_FLOAT;
 		else
 			throw std::runtime_error{ "unsupported format" };
 
-		nnedi3_params.bit_depth = m_vi.format->bitsPerSample;
+		nnedi3_params.bit_depth = m_vi.format.bitsPerSample;
 
 		propagate_if_set(nnedi3_params.nsize, in.get_prop<int>("nsize", map::default_val(-1)));
 		propagate_if_set(nnedi3_params.nns, in.get_prop<int>("nns", map::default_val(-1)));
@@ -201,43 +195,42 @@ public:
 		if (!m_nnedi3)
 			throw std::runtime_error{ "failed to create nnedi3" };
 
-		if (m_vi.format->colorFamily == cmYUV || m_vi.format->colorFamily == cmYCoCg) {
-			m_nnedi3_chroma.reset(znedi3_filter_create(nnedi3_weights.get(), &nnedi3_params, m_vi.width >> m_vi.format->subSamplingW, (m_vi.height / 2) >> m_vi.format->subSamplingH));
+		if (m_vi.format.colorFamily == cfYUV) {
+			m_nnedi3_chroma.reset(znedi3_filter_create(nnedi3_weights.get(), &nnedi3_params, m_vi.width >> m_vi.format.subSamplingW, (m_vi.height / 2) >> m_vi.format.subSamplingH));
 			if (!m_nnedi3_chroma)
 				throw std::runtime_error{ "failed to create nnedi3" };
 		}
 
-		return{ fmParallel, 0 };
+		out.set_prop("clip", create_video_filter(m_vi, fmParallel, simple_dep(m_clip, rpStrictSpatial), core));
 	}
 
-	std::pair<const ::VSVideoInfo *, size_t> get_video_info() noexcept override
+	ConstFrame get_frame_initial(int n, const Core &, const FrameContext &frame_context, void *) override
 	{
-		return{ &m_vi, 1 };
+		frame_context.request_frame(get_src_frameno(n), m_clip);
+		return nullptr;
 	}
 
-	ConstVideoFrame get_frame_initial(int n, const VapourCore &, ::VSFrameContext *frame_ctx) override
+	ConstFrame get_frame(int n, const Core &core, const FrameContext &frame_context, void *) override
 	{
-		m_clip.request_frame_filter(get_src_frameno(n), frame_ctx);
-		return ConstVideoFrame{};
-	}
-
-	ConstVideoFrame get_frame(int n, const VapourCore &core, ::VSFrameContext *frame_ctx) override
-	{
-		ConstVideoFrame src_frame = m_clip.get_frame_filter(get_src_frameno(n), frame_ctx);
-		VideoFrame dst_frame = core.new_video_frame(src_frame.format(), src_frame.width(0), src_frame.height(0) * (m_dh ? 2 : 1), src_frame);
+		ConstFrame src_frame = frame_context.get_frame(get_src_frameno(n), m_clip);
+		Frame dst_frame = core.new_video_frame(src_frame.video_format(), src_frame.width(0), src_frame.height(0) * (m_dh ? 2 : 1), src_frame);
 
 		unsigned src_parity = get_src_parity(src_frame, n);
 
-		std::pair<size_t, VideoFrame> tmp_buffer{};
-		void *tmp = nullptr;
+		size_t tmp_size = znedi3_filter_get_tmp_size(m_nnedi3.get());
+		if (m_nnedi3_chroma)
+			tmp_size = std::max(tmp_size, znedi3_filter_get_tmp_size(m_nnedi3_chroma.get()));
 
-		for (int p = 0; p < src_frame.format().numPlanes; ++p) {
+		Frame tmp_buffer = core.new_video_frame(core.get_video_format_by_id(pfGray8), static_cast<int>(tmp_size), 1);
+		void *tmp = tmp_buffer.write_ptr();
+
+		for (int p = 0; p < src_frame.video_format().numPlanes; ++p) {
 			if (!m_planes[p])
 				continue;
 
 			unsigned width = src_frame.width(p);
 			unsigned height = src_frame.height(p);
-			size_t rowsize = static_cast<size_t>(width) * src_frame.format().bytesPerSample;
+			size_t rowsize = static_cast<size_t>(width) * src_frame.video_format().bytesPerSample;
 
 			if (!m_dh)
 				height /= 2;
@@ -254,54 +247,26 @@ public:
 			uint8_t *dst_field_p = dst_p + static_cast<int>(!src_parity) * dst_stride;
 			int dst_field_stride = dst_stride * 2;
 
-			znedi3_filter *nnedi3 = (p > 0 && (m_vi.format->colorFamily == cmYUV || m_vi.format->colorFamily == cmYCoCg)) ? m_nnedi3_chroma.get() : m_nnedi3.get();
-
-			size_t tmp_size = znedi3_filter_get_tmp_size(nnedi3);
-			if (tmp_size > tmp_buffer.first) {
-				std::pair<size_t, VideoFrame> buffer{};
-
-				{
-					std::lock_guard<std::mutex> lock{ m_cache_mutex };
-
-					if (!m_cache.empty()) {
-						buffer = std::move(m_cache.back());
-						m_cache.pop_back();
-					}
-				}
-
-				if (buffer.first < tmp_size) {
-					buffer.first = tmp_size;
-					buffer.second = core.new_video_frame(*core.format_preset(pfGray8), static_cast<int>(tmp_size), 1);
-				}
-
-				tmp_buffer = std::move(buffer);
-				tmp = tmp_buffer.second.write_ptr(0);
-			}
-
+			znedi3_filter *nnedi3 = (p > 0 && m_vi.format.colorFamily == cfYUV) ? m_nnedi3_chroma.get() : m_nnedi3.get();
 			znedi3_filter_process(nnedi3, src_field_p, src_field_stride, dst_field_p, dst_field_stride, tmp, !src_parity);
 
 			uint8_t *dst_other_field_p = dst_p + static_cast<int>(src_parity) * dst_stride;
-			vs_bitblt(dst_other_field_p, dst_field_stride, src_field_p, src_field_stride, rowsize, height);
+			vsh::bitblt(dst_other_field_p, dst_field_stride, src_field_p, src_field_stride, rowsize, height);
 		}
 
-		if (tmp_buffer.first) {
-			std::lock_guard<std::mutex> lock{ m_cache_mutex };
-			m_cache.emplace_back(std::move(tmp_buffer));
-		}
-
-		PropertyMapRef dst_props = dst_frame.frame_props();
-		dst_props.set_prop("_FieldBased", 0, paReplace);
+		MapRef dst_props = dst_frame.frame_props_rw();
+		dst_props.set_prop("_FieldBased", 0);
 		dst_props.erase("_Field");
 
 		return dst_frame;
 	}
 };
 
-const PluginInfo g_plugin_info{
-	PLUGIN_ID, "znedi3", "Neural network edge directed interpolation (3rd gen.)",
+const PluginInfo4 g_plugin_info4{
+	PLUGIN_ID, "znedi3", "Neural network edge directed interpolation (3rd gen.)", 3,
 	{
-		{ vsxx::FilterBase::filter_create<VSZNEDI3>, "nnedi3",
-			"clip:clip;"
+		{ vsxx4::FilterBase::filter_create<VSZNEDI3>, "nnedi3",
+			"clip:vnode;"
 			"field:int;"
 			"dh:int:opt;"
 			"planes:int[]:opt;"
@@ -316,7 +281,8 @@ const PluginInfo g_plugin_info{
 			"exp:int:opt;"
 			"show_mask:int:opt;"
 			"x_nnedi3_weights_bin:data:opt;"
-			"x_cpu:data:opt;"
+			"x_cpu:data:opt;",
+			"clip:vnode;"
 		}
 	}
 };

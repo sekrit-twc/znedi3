@@ -62,11 +62,11 @@ testapp_OBJS = \
 	testapp/win32_bitmap.o
 
 vsxx_HDRS = \
-	vsxx/VapourSynth.h \
-	vsxx/VapourSynth++.hpp \
-	vsxx/VSScript.h \
-	vsxx/VSHelper.h \
-	vsxx/vsxx_pluginmain.h
+	vsxx/VapourSynth/VapourSynth4.h \
+	vsxx/VapourSynth/VSHelper4.h \
+	vsxx/VapourSynth/VSScript4.h \
+	vsxx/VapourSynth4++.hpp \
+	vsxx/vsxx4_pluginmain.h
 
 ifeq ($(X86), 1)
   znedi3/x86/kernel_avx.o: EXTRA_CXXFLAGS := -mavx -mtune=sandybridge
@@ -87,7 +87,7 @@ all: vsznedi3.so
 testapp/testapp: $(testapp_OBJS) $(znedi3_OBJS) $(graphengine_OBJS)
 	$(CXX) $(MY_LDFLAGS) $^ $(MY_LIBS) -o $@
 
-vsznedi3.so: vsznedi3/vsznedi3.o vsxx/vsxx_pluginmain.o $(znedi3_OBJS) $(graphengine_OBJS)
+vsznedi3.so: vsznedi3/vsznedi3.o vsxx/vsxx4_pluginmain.o $(znedi3_OBJS) $(graphengine_OBJS)
 	$(CXX) -shared $(MY_LDFLAGS) $^ $(MY_LIBS) -o $@
 
 clean:

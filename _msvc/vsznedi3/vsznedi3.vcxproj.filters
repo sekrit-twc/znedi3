@@ -21,11 +21,11 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\vsxx\vsxx_pluginmain.cpp">
-      <Filter>Source Files\vsxx</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\vsznedi3\vsznedi3.cpp">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\vsxx\vsxx4_pluginmain.cpp">
+      <Filter>Source Files\vsxx</Filter>
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
