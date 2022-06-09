@@ -1,17 +1,17 @@
 MY_CFLAGS := -O2 -fPIC $(CFLAGS)
 MY_CXXFLAGS := -std=c++14 -O2 -fPIC $(CXXFLAGS)
-MY_CPPFLAGS := -Dgraphengine=graphengine_znedi3 -Igraphengine -Iznedi3 -Ivsxx -Ivsxx/VapourSynth $(CPPFLAGS)
+MY_CPPFLAGS := -Dgraphengine=graphengine_znedi3 -Igraphengine/include -Iznedi3 -Ivsxx -Ivsxx/VapourSynth $(CPPFLAGS)
 MY_LDFLAGS := $(LDFLAGS)
 MY_LIBS := $(LIBS)
 
 graphengine_HDRS = \
 	graphengine/graphengine/cpuinfo.h \
-	graphengine/graphengine/filter.h \
-	graphengine/graphengine/graph.h \
 	graphengine/graphengine/node.h \
 	graphengine/graphengine/state.h \
-	graphengine/graphengine/types.h \
-	graphengine/graphengine/x86/cpuinfo_x86.h
+	graphengine/graphengine/x86/cpuinfo_x86.h \
+	graphengine/include/graphengine/filter.h \
+	graphengine/include/graphengine/graph.h \
+	graphengine/include/graphengine/types.h
 
 graphengine_OBJS = \
 	graphengine/graphengine/cpuinfo.o \

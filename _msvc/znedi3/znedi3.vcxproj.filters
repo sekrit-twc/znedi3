@@ -31,6 +31,9 @@
     <Filter Include="Header Files\graphengine\x86">
       <UniqueIdentifier>{0c49db3d-7378-48cb-84d1-1be499db1e6d}</UniqueIdentifier>
     </Filter>
+    <Filter Include="Header Files\graphengine\include">
+      <UniqueIdentifier>{8977124f-b059-4d8e-a44c-4f92a1287c04}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\znedi3\kernel.h">
@@ -72,23 +75,23 @@
     <ClInclude Include="..\..\graphengine\graphengine\cpuinfo.h">
       <Filter>Header Files\graphengine</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\graphengine\graphengine\filter.h">
-      <Filter>Header Files\graphengine</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\graphengine\graphengine\graph.h">
-      <Filter>Header Files\graphengine</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\graphengine\graphengine\node.h">
       <Filter>Header Files\graphengine</Filter>
     </ClInclude>
     <ClInclude Include="..\..\graphengine\graphengine\state.h">
       <Filter>Header Files\graphengine</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\graphengine\graphengine\types.h">
-      <Filter>Header Files\graphengine</Filter>
-    </ClInclude>
     <ClInclude Include="..\..\graphengine\graphengine\x86\cpuinfo_x86.h">
       <Filter>Header Files\graphengine\x86</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\graphengine\include\graphengine\filter.h">
+      <Filter>Header Files\graphengine\include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\graphengine\include\graphengine\graph.h">
+      <Filter>Header Files\graphengine\include</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\graphengine\include\graphengine\types.h">
+      <Filter>Header Files\graphengine\include</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
