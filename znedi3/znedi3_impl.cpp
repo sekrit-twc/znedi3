@@ -419,7 +419,7 @@ struct znedi3_filter::filters {
 };
 
 struct znedi3_filter::data {
-	graphengine::Graph graph;
+	graphengine::GraphImpl graph;
 	node_id src_node = graphengine::null_node;
 	node_id dst_node = graphengine::null_node;
 };
