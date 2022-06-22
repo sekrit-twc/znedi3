@@ -424,11 +424,13 @@ struct znedi3_filter::data {
 	node_id dst_node = graphengine::null_node;
 };
 
-znedi3_filter::znedi3_filter(const NNEDI3Weights &weights, const znedi3_filter_params &params, unsigned width, unsigned height)
+znedi3_filter::znedi3_filter(const NNEDI3Weights &weights, const znedi3_filter_params &params, unsigned width, unsigned height) try
 {
 	m_filters = setup_filters(weights, params, width, height);
 	m_data_t = setup_graph(weights, params, width, height, false);
 	m_data_b = setup_graph(weights, params, width, height, true);
+} catch (const graphengine::Exception &e) {
+	throw std::runtime_error{ e.msg };
 }
 
 znedi3_filter::~znedi3_filter() = default;
