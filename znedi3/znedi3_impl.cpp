@@ -144,14 +144,14 @@ public:
 
 	const graphengine::FilterDescriptor &descriptor() const noexcept override { return m_desc; }
 
-	std::pair<unsigned, unsigned> get_row_deps(unsigned i) const noexcept override
+	pair_unsigned get_row_deps(unsigned i) const noexcept override
 	{
 		i = std::max(i, PADDING_V - m_parity) - (PADDING_V - m_parity);
 		i = std::min(i, m_orig_height - 1);
 		return{ i, i + 1 };
 	}
 
-	std::pair<unsigned, unsigned> get_col_deps(unsigned left, unsigned right) const noexcept override
+	pair_unsigned get_col_deps(unsigned left, unsigned right) const noexcept override
 	{
 		left = std::max(left, PADDING_H) - PADDING_H;
 		right = std::min(std::max(right, PADDING_H) - PADDING_H, m_orig_width);
@@ -201,12 +201,12 @@ public:
 
 	const graphengine::FilterDescriptor &descriptor() const noexcept override { return m_desc; }
 
-	std::pair<unsigned, unsigned> get_row_deps(unsigned i) const noexcept override
+	pair_unsigned get_row_deps(unsigned i) const noexcept override
 	{
 		return{ i + PADDING_V, i + PADDING_V + 1 };
 	}
 
-	std::pair<unsigned, unsigned> get_col_deps(unsigned left, unsigned right) const noexcept override
+	pair_unsigned get_col_deps(unsigned left, unsigned right) const noexcept override
 	{
 		return{ left + PADDING_H, right + PADDING_H };
 	}
@@ -243,7 +243,7 @@ public:
 
 	const graphengine::FilterDescriptor &descriptor() const noexcept override { return m_desc; }
 
-	std::pair<unsigned, unsigned> get_row_deps(unsigned i) const noexcept override
+	pair_unsigned get_row_deps(unsigned i) const noexcept override
 	{
 		i = std::max(i, PADDING_V);
 
@@ -251,7 +251,7 @@ public:
 		return{ i - 2, std::min(i + 2, m_desc.format.height) };
 	}
 
-	std::pair<unsigned, unsigned> get_col_deps(unsigned left, unsigned right) const noexcept override
+	pair_unsigned get_col_deps(unsigned left, unsigned right) const noexcept override
 	{
 		left = std::max(left, PADDING_H);
 		right = std::min(right, m_desc.format.width - PADDING_H);
@@ -302,7 +302,7 @@ public:
 
 	const graphengine::FilterDescriptor &descriptor() const noexcept override { return m_desc; }
 
-	std::pair<unsigned, unsigned> get_row_deps(unsigned i) const noexcept override
+	pair_unsigned get_row_deps(unsigned i) const noexcept override
 	{
 		i = std::max(i, PADDING_V);
 
@@ -310,7 +310,7 @@ public:
 		return{ i - 3, std::min(i + 3, m_desc.format.height) };
 	}
 
-	std::pair<unsigned, unsigned> get_col_deps(unsigned left, unsigned right) const noexcept override
+	pair_unsigned get_col_deps(unsigned left, unsigned right) const noexcept override
 	{
 		left = std::max(left, PADDING_H);
 		right = std::min(right, m_desc.format.width - PADDING_H);
@@ -371,7 +371,7 @@ public:
 
 	const graphengine::FilterDescriptor &descriptor() const noexcept override { return m_desc; }
 
-	std::pair<unsigned, unsigned> get_row_deps(unsigned i) const noexcept override
+	pair_unsigned get_row_deps(unsigned i) const noexcept override
 	{
 		i = std::max(i, PADDING_V);
 
@@ -379,7 +379,7 @@ public:
 		return{ i - 2, std::min(i + 2, m_desc.format.height) };
 	}
 
-	std::pair<unsigned, unsigned> get_col_deps(unsigned left, unsigned right) const noexcept override { return{ left, right }; }
+	pair_unsigned get_col_deps(unsigned left, unsigned right) const noexcept override { return{ left, right }; }
 
 	void init_context(void *) const noexcept override {}
 
