@@ -19,21 +19,6 @@
     <Filter Include="Source Files\x86">
       <UniqueIdentifier>{28535101-4751-452b-95fa-817f80618640}</UniqueIdentifier>
     </Filter>
-    <Filter Include="Header Files\graphengine">
-      <UniqueIdentifier>{16376947-7557-4eab-b0c5-2693c7e1847b}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\graphengine">
-      <UniqueIdentifier>{af5cce9b-76c7-433d-b140-74ef5c2909f0}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Source Files\graphengine\x86">
-      <UniqueIdentifier>{c68a112d-dbb4-4462-ac20-e19fdf3a1680}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\graphengine\x86">
-      <UniqueIdentifier>{0c49db3d-7378-48cb-84d1-1be499db1e6d}</UniqueIdentifier>
-    </Filter>
-    <Filter Include="Header Files\graphengine\include">
-      <UniqueIdentifier>{8977124f-b059-4d8e-a44c-4f92a1287c04}</UniqueIdentifier>
-    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="..\..\znedi3\kernel.h">
@@ -71,30 +56,6 @@
     </ClInclude>
     <ClInclude Include="..\..\znedi3\x86\kernel_avx_common.h">
       <Filter>Header Files\x86</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\graphengine\graphengine\cpuinfo.h">
-      <Filter>Header Files\graphengine</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\graphengine\graphengine\node.h">
-      <Filter>Header Files\graphengine</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\graphengine\graphengine\state.h">
-      <Filter>Header Files\graphengine</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\graphengine\graphengine\x86\cpuinfo_x86.h">
-      <Filter>Header Files\graphengine\x86</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\graphengine\include\graphengine\filter.h">
-      <Filter>Header Files\graphengine\include</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\graphengine\include\graphengine\graph.h">
-      <Filter>Header Files\graphengine\include</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\graphengine\include\graphengine\namespace.h">
-      <Filter>Header Files\graphengine\include</Filter>
-    </ClInclude>
-    <ClInclude Include="..\..\graphengine\include\graphengine\types.h">
-      <Filter>Header Files\graphengine\include</Filter>
     </ClInclude>
   </ItemGroup>
   <ItemGroup>
@@ -136,18 +97,6 @@
     </ClCompile>
     <ClCompile Include="..\..\znedi3\znedi3_impl.cpp">
       <Filter>Source Files</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\graphengine\graphengine\cpuinfo.cpp">
-      <Filter>Source Files\graphengine</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\graphengine\graphengine\graph.cpp">
-      <Filter>Source Files\graphengine</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\graphengine\graphengine\node.cpp">
-      <Filter>Source Files\graphengine</Filter>
-    </ClCompile>
-    <ClCompile Include="..\..\graphengine\graphengine\x86\cpuinfo_x86.cpp">
-      <Filter>Source Files\graphengine\x86</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
