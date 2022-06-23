@@ -1,6 +1,6 @@
 MY_CFLAGS := -O2 -fPIC $(CFLAGS)
 MY_CXXFLAGS := -std=c++14 -O2 -fPIC $(CXXFLAGS)
-MY_CPPFLAGS := -Dgraphengine=graphengine_znedi3 -Igraphengine/include -Iznedi3 -Ivsxx -Ivsxx/VapourSynth $(CPPFLAGS)
+MY_CPPFLAGS := -DGRAPHENGINE_IMPL_NAMESPACE=znedi3 -Igraphengine/include -Iznedi3 -Ivsxx -Ivsxx/VapourSynth $(CPPFLAGS)
 MY_LDFLAGS := $(LDFLAGS)
 MY_LIBS := $(LIBS)
 
@@ -11,6 +11,7 @@ graphengine_HDRS = \
 	graphengine/graphengine/x86/cpuinfo_x86.h \
 	graphengine/include/graphengine/filter.h \
 	graphengine/include/graphengine/graph.h \
+	graphengine/include/graphengine/namespace.h \
 	graphengine/include/graphengine/types.h
 
 graphengine_OBJS = \

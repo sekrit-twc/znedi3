@@ -90,6 +90,9 @@
     <ClInclude Include="..\..\graphengine\include\graphengine\graph.h">
       <Filter>Header Files\graphengine\include</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\graphengine\include\graphengine\namespace.h">
+      <Filter>Header Files\graphengine\include</Filter>
+    </ClInclude>
     <ClInclude Include="..\..\graphengine\include\graphengine\types.h">
       <Filter>Header Files\graphengine\include</Filter>
     </ClInclude>
