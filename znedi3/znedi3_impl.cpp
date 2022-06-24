@@ -142,6 +142,8 @@ public:
 		m_desc.alignment_mask = 63;
 	}
 
+	int version() const noexcept override { return VERSION; }
+
 	const graphengine::FilterDescriptor &descriptor() const noexcept override { return m_desc; }
 
 	pair_unsigned get_row_deps(unsigned i) const noexcept override
@@ -199,6 +201,8 @@ public:
 		m_desc.alignment_mask = 15;
 	}
 
+	int version() const noexcept override { return VERSION; }
+
 	const graphengine::FilterDescriptor &descriptor() const noexcept override { return m_desc; }
 
 	pair_unsigned get_row_deps(unsigned i) const noexcept override
@@ -240,6 +244,8 @@ public:
 
 		m_desc.scratchpad_size = m_prescreener->get_tmp_size();
 	}
+
+	int version() const noexcept override { return VERSION; }
 
 	const graphengine::FilterDescriptor &descriptor() const noexcept override { return m_desc; }
 
@@ -299,6 +305,8 @@ public:
 		m_desc.context_size = prescreener ? 0 : width;
 		m_desc.scratchpad_size = m_predictor->get_tmp_size();
 	}
+
+	int version() const noexcept override { return VERSION; }
 
 	const graphengine::FilterDescriptor &descriptor() const noexcept override { return m_desc; }
 
@@ -368,6 +376,8 @@ public:
 
 		m_desc.flags.in_place = true;
 	}
+
+	int version() const noexcept override { return VERSION; }
 
 	const graphengine::FilterDescriptor &descriptor() const noexcept override { return m_desc; }
 
