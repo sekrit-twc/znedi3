@@ -1,3 +1,6 @@
 [submodule "vsplugin/vsxx"]
 	path = vsxx
 	url = https://github.com/sekrit-twc/vsxx.git
+[submodule "graphengine"]
+	path = graphengine
+	url = https://github.com/sekrit-twc/graphengine.git
