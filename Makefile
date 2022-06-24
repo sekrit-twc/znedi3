@@ -1,5 +1,5 @@
 MY_CFLAGS := -O2 -fPIC $(CFLAGS)
-MY_CXXFLAGS := -std=c++14 -O2 -fPIC $(CXXFLAGS)
+MY_CXXFLAGS := -std=c++14 -O2 -fPIC -fvisibility=hidden $(CXXFLAGS)
 MY_CPPFLAGS := -DGRAPHENGINE_IMPL_NAMESPACE=znedi3 -Igraphengine/include -Iznedi3 -Ivsxx -Ivsxx/VapourSynth $(CPPFLAGS)
 MY_LDFLAGS := $(LDFLAGS)
 MY_LIBS := $(LIBS)
@@ -92,7 +92,7 @@ vsznedi3.so: vsznedi3/vsznedi3.o vsxx/vsxx4_pluginmain.o $(znedi3_OBJS) $(graphe
 	$(CXX) -shared $(MY_LDFLAGS) $^ $(MY_LIBS) -o $@
 
 clean:
-	rm -f *.a *.o *.so graphengine/graphengine/*.o testapp/testapp testapp/*.o znedi3/*.o znedi3/x86/*.o vsznedi3/*.o vsxx/*.o
+	rm -f *.a *.o *.so graphengine/graphengine/*.o graphengine/graphengine/x86/*.o testapp/testapp testapp/*.o znedi3/*.o znedi3/x86/*.o vsznedi3/*.o vsxx/*.o
 
 %.o: %.cpp $(graphengine_HDRS) $(znedi3_HDRS) $(testapp_HDRS) $(vsxx_HDRS)
 	$(CXX) -c $(EXTRA_CXXFLAGS) $(MY_CXXFLAGS) $(MY_CPPFLAGS) $< -o $@
