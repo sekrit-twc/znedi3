@@ -575,11 +575,13 @@ void znedi3_filter::process(const void *src, ptrdiff_t src_stride, void *dst, pt
 {
 	data *data = parity ? m_data_b.get() : m_data_t.get();
 
-	graphengine::Graph::EndpointConfiguration endpoints{};
-	endpoints[0].id = data->src_node;
-	endpoints[0].buffer[0] = { const_cast<void *>(src), src_stride, graphengine::BUFFER_MAX };
-	endpoints[1].id = data->dst_node;
-	endpoints[1].buffer[0] = { dst, dst_stride, graphengine::BUFFER_MAX };
+	graphengine::BufferDescriptor src_buffer{ const_cast<void *>(src), src_stride, graphengine::BUFFER_MAX };
+	graphengine::BufferDescriptor dst_buffer{ dst, dst_stride, graphengine::BUFFER_MAX };
+
+	graphengine::Graph::Endpoint endpoints[] = {
+		{ data->src_node, &src_buffer },
+		{ data->dst_node, &dst_buffer },
+	};
 
 	data->graph.run(endpoints, tmp);
 }
