@@ -29,19 +29,19 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\vsxx\VapourSynth.h">
+    <ClInclude Include="..\..\vsxx\VapourSynth4++.hpp">
       <Filter>Header Files\vsxx</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\vsxx\VapourSynth++.hpp">
+    <ClInclude Include="..\..\vsxx\vsxx4_pluginmain.h">
       <Filter>Header Files\vsxx</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\vsxx\VSHelper.h">
+    <ClInclude Include="..\..\vsxx\vapoursynth\VapourSynth4.h">
       <Filter>Header Files\vsxx</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\vsxx\VSScript.h">
+    <ClInclude Include="..\..\vsxx\vapoursynth\VSConstants4.h">
       <Filter>Header Files\vsxx</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\vsxx\vsxx_pluginmain.h">
+    <ClInclude Include="..\..\vsxx\vapoursynth\VSHelper4.h">
       <Filter>Header Files\vsxx</Filter>
     </ClInclude>
   </ItemGroup>

@@ -1,6 +1,6 @@
 MY_CFLAGS := -O2 -fPIC $(CFLAGS)
 MY_CXXFLAGS := -std=c++14 -O2 -fPIC -fvisibility=hidden $(CXXFLAGS)
-MY_CPPFLAGS := -DGRAPHENGINE_IMPL_NAMESPACE=znedi3 -Igraphengine/include -Iznedi3 -Ivsxx -Ivsxx/VapourSynth $(CPPFLAGS)
+MY_CPPFLAGS := -DGRAPHENGINE_IMPL_NAMESPACE=znedi3 -Igraphengine/include -Iznedi3 -Ivsxx -Ivsxx/vapoursynth $(CPPFLAGS)
 MY_LDFLAGS := $(LDFLAGS)
 MY_LIBS := $(LIBS)
 
@@ -63,9 +63,8 @@ testapp_OBJS = \
 	testapp/win32_bitmap.o
 
 vsxx_HDRS = \
-	vsxx/VapourSynth/VapourSynth4.h \
-	vsxx/VapourSynth/VSHelper4.h \
-	vsxx/VapourSynth/VSScript4.h \
+	vsxx/vapoursynth/VapourSynth4.h \
+	vsxx/vapoursynth/VSHelper4.h \
 	vsxx/VapourSynth4++.hpp \
 	vsxx/vsxx4_pluginmain.h
 
