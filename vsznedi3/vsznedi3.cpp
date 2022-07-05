@@ -7,6 +7,7 @@
 #include <vector>
 #include <znedi3.h>
 
+#include <VSConstants4.h>
 #include <VSHelper4.h>
 #include "vsxx4_pluginmain.h"
 
@@ -86,8 +87,8 @@ class VSZNEDI3 : public vsxx4::FilterBase {
 			unsigned parity = props.get_prop<unsigned>("_Field", map::default_val(default_parity));
 			return parity;
 		} else if (m_mode == FieldOperation::BOB_BOTTOM_FIRST || m_mode == FieldOperation::BOB_TOP_FIRST) {
-			unsigned field_based = props.get_prop<unsigned>("_FieldBased", map::default_val(0U));
-			unsigned parity = field_based ? !(field_based - 1) : default_parity;
+			int field_based = props.get_prop<int>("_FieldBased", static_cast<int>(VSC_FIELD_PROGRESSIVE));
+			unsigned parity = field_based == VSC_FIELD_BOTTOM ? 1 : field_based == VSC_FIELD_TOP ? 0 : default_parity;
 
 			return n % 2 ? !parity : parity;
 		} else {
@@ -201,7 +202,7 @@ public:
 				throw std::runtime_error{ "failed to create nnedi3" };
 		}
 
-		out.set_prop("clip", create_video_filter(m_vi, fmParallel, simple_dep(m_clip, rpStrictSpatial), core));
+		create_video_filter(out, m_vi, fmParallel, simple_dep(m_clip, rpStrictSpatial), core);
 	}
 
 	ConstFrame get_frame_initial(int n, const Core &, const FrameContext &frame_context, void *) override

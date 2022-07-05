@@ -64,6 +64,7 @@ testapp_OBJS = \
 
 vsxx_HDRS = \
 	vsxx/vapoursynth/VapourSynth4.h \
+	vsxx/vapoursynth/VSConstants4.h \
 	vsxx/vapoursynth/VSHelper4.h \
 	vsxx/VapourSynth4++.hpp \
 	vsxx/vsxx4_pluginmain.h
