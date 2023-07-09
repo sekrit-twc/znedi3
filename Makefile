@@ -1,6 +1,6 @@
 MY_CFLAGS := -O2 -fPIC $(CFLAGS)
 MY_CXXFLAGS := -std=c++14 -O2 -fPIC -fvisibility=hidden $(CXXFLAGS)
-MY_CPPFLAGS := -DGRAPHENGINE_IMPL_NAMESPACE=znedi3 -Igraphengine/include -Iznedi3 -Ivsxx -Ivsxx/vapoursynth $(CPPFLAGS)
+MY_CPPFLAGS := -DGRAPHENGINE_IMPL_NAMESPACE=znedi3 -DNDEBUG -Igraphengine/include -Iznedi3 -Ivsxx -Ivsxx/vapoursynth $(CPPFLAGS)
 MY_LDFLAGS := $(LDFLAGS)
 MY_LIBS := $(LIBS)
 
