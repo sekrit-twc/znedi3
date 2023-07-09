@@ -237,16 +237,16 @@ public:
 				height /= 2;
 
 			const uint8_t *src_p = src_frame.read_ptr(p);
-			int src_stride = src_frame.stride(p);
+			ptrdiff_t src_stride = src_frame.stride(p);
 
 			uint8_t *dst_p = dst_frame.write_ptr(p);
-			int dst_stride = dst_frame.stride(p);
+			ptrdiff_t dst_stride = dst_frame.stride(p);
 
 			const uint8_t *src_field_p = src_p + (m_dh ? 0 : static_cast<int>(src_parity) * src_stride);
-			int src_field_stride = src_stride * (m_dh ? 1 : 2);
+			ptrdiff_t src_field_stride = src_stride * (m_dh ? 1 : 2);
 
 			uint8_t *dst_field_p = dst_p + static_cast<int>(!src_parity) * dst_stride;
-			int dst_field_stride = dst_stride * 2;
+			ptrdiff_t dst_field_stride = dst_stride * 2;
 
 			znedi3_filter *nnedi3 = (p > 0 && m_vi.format.colorFamily == cfYUV) ? m_nnedi3_chroma.get() : m_nnedi3.get();
 			znedi3_filter_process(nnedi3, src_field_p, src_field_stride, dst_field_p, dst_field_stride, tmp, !src_parity);

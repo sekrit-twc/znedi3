@@ -345,7 +345,7 @@ public:
 		ptrdiff_t window_offset = 5;
 
 		for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(n); i += 512) {
-			ptrdiff_t nn = i + 512 > static_cast<ptrdiff_t>(n) ? static_cast<ptrdiff_t>(n) - i : 512;
+			unsigned nn = static_cast<unsigned>(i + 512 > static_cast<ptrdiff_t>(n) ? static_cast<ptrdiff_t>(n) - i : 512);
 
 			prescreener_old_layer0_avx(m_data.kernel_l0, m_data.bias_l0, src, i - window_offset, activation, activation_stride, nn);
 			prescreener_old_layer1_avx(m_data.kernel_l1, m_data.bias_l1, activation, activation_stride, nn);
@@ -929,7 +929,7 @@ public:
 				continue;
 
 			gather_pixels_avx(src + window_offset_y, i - window_offset_x, m_model.xdim, m_model.ydim, input + num_gathered * filter_size, partial_sum_sumsq + num_gathered * 2);
-			gathered_idx[num_gathered] = i;
+			gathered_idx[num_gathered] = static_cast<unsigned>(i);
 			++num_gathered;
 
 			if (num_gathered == 4) {
