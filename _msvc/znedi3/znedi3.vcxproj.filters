@@ -65,9 +65,6 @@
     <ClCompile Include="..\..\znedi3\x86\cpuinfo_x86.cpp">
       <Filter>Source Files\x86</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\znedi3\cpuinfo.cpp">
-      <Filter>Source Files</Filter>
-    </ClCompile>
     <ClCompile Include="..\..\znedi3\x86\kernel_avx512.cpp">
       <Filter>Source Files\x86</Filter>
     </ClCompile>

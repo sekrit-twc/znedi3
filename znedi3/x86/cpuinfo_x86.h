@@ -47,9 +47,6 @@ struct X86Capabilities {
  */
 X86Capabilities query_x86_capabilities() noexcept;
 
-bool cpu_has_fast_f16_x86(CPUClass cpu) noexcept;
-bool cpu_requires_64b_alignment_x86(CPUClass cpu) noexcept;
-
 } // namespace znedi3
 
 #endif // ZNEDI3_X86_CPUINFO_X86_H_

@@ -140,7 +140,6 @@
     <ClInclude Include="..\..\znedi3\znedi3_impl.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\znedi3\cpuinfo.cpp" />
     <ClCompile Include="..\..\znedi3\kernel.cpp" />
     <ClCompile Include="..\..\znedi3\weights.cpp" />
     <ClCompile Include="..\..\znedi3\x86\cpuinfo_x86.cpp" />

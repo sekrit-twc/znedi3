@@ -35,7 +35,6 @@ znedi3_HDRS = \
 	znedi3/znedi3_impl.h
 
 znedi3_OBJS = \
-	znedi3/cpuinfo.o \
 	znedi3/kernel.o \
 	znedi3/weights.o \
 	znedi3/x86/cpuinfo_x86.o \
