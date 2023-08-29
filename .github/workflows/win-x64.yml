@@ -1,0 +1,45 @@
+# Idea stolen from AmusementClub/VapourSynth-WNNM & AmusementClub/OKEGui.
+name: Windows
+
+on: workflow_dispatch
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: cmd
+
+    steps:
+    - name: Checkout repo
+      uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+
+    - name: Setup MSBuild
+      uses: microsoft/setup-msbuild@v1.1
+
+    - name: Cache oneAPI Base Toolkit
+      id: cache-onetool
+      uses: actions/cache@v3
+      with:
+        path: C:\Program Files (x86)\Intel\oneAPI
+        key: ${{ runner.os }}-onetool-2023.2.0.49396
+
+    - name: Setup oneAPI Base Toolkit
+      if: steps.cache-onetool.outputs.cache-hit != 'true'
+      run: |
+        curl -s -o onetool.exe -L https://registrationcenter-download.intel.com/akdlm/IRC_NAS/f96c71db-2c6c-45d9-8c1f-0348ef5885cf/w_BaseKit_p_2023.2.0.49396_offline.exe
+        onetool.exe -s -a --silent --eula accept
+
+    - name: Build
+      run: |
+        msbuild.exe _msvc\znedi3.sln /p:Platform=x64 /p:Configuration=Release
+        cd _msvc\x64
+        7z a -t7z -mx9 znedi3.7z .\Release
+
+    - name: Upload
+      uses: actions/upload-artifact@v3
+      with:
+        name: znedi3-windows-x64
+        path: _msvc/x64/znedi3.7z
