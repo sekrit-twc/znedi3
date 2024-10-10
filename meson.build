@@ -121,6 +121,15 @@ if host_cpu_family.startswith('x86')
 
 endif
 
+if host_cpu_family.startswith('aarch') or host_cpu_family.startswith('arm')
+  cflags += ['-DZNEDI3_ARM=1']
+
+  znedi3_sources += [
+    'znedi3/arm/kernel_arm.cpp',
+    'znedi3/arm/kernel_neon.cpp',
+  ]
+endif
+
 znedi3_helper_libs += static_library('graphengine',
                               graphengine_sources,
                               include_directories: includes,

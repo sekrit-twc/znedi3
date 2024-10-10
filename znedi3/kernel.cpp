@@ -11,8 +11,10 @@
 #include "weights.h"
 #include "znedi3_impl.h"
 
-#ifdef ZNEDI3_X86
+#if defined(ZNEDI3_X86)
   #include "x86/kernel_x86.h"
+#elif defined(ZNEDI3_ARM)
+  #include "arm/kernel_arm.h"
 #endif
 
 namespace znedi3 {
@@ -295,8 +297,10 @@ pixel_io_func select_pixel_io_func(PixelType in, PixelType out, CPUClass cpu)
 {
 	pixel_io_func ret = nullptr;
 
-#ifdef ZNEDI3_X86
+#if defined(ZNEDI3_X86)
 	ret = select_pixel_io_func_x86(in, out, cpu);
+#elif defined(ZNEDI3_ARM)
+	ret = select_pixel_io_func_arm(in, out, cpu);
 #endif
 
 	if (!ret && in == PixelType::BYTE && out == PixelType::FLOAT)
@@ -317,8 +321,10 @@ interpolate_func select_interpolate_func(CPUClass cpu)
 {
 	interpolate_func ret = nullptr;
 
-#ifdef ZNEDI3_X86
+#if defined(ZNEDI3_X86)
 	ret = select_interpolate_func_x86(cpu);
+#elif defined(ZNEDI3_ARM)
+	ret = select_interpolate_func_arm(cpu);
 #endif
 
 	if (!ret)
@@ -332,8 +338,10 @@ std::unique_ptr<Prescreener> create_prescreener_old(const PrescreenerOldCoeffici
 {
 	std::unique_ptr<Prescreener> ret;
 
-#ifdef ZNEDI3_X86
+#if defined(ZNEDI3_X86)
 	ret = create_prescreener_old_x86(coeffs, pixel_half, cpu);
+#elif defined(ZNEDI3_ARM)
+	ret = create_prescreener_old_arm(coeffs, pixel_half, cpu);
 #endif
 
 	if (!ret)
@@ -347,8 +355,10 @@ std::unique_ptr<Prescreener> create_prescreener_new(const PrescreenerNewCoeffici
 {
 	std::unique_ptr<Prescreener> ret;
 
-#ifdef ZNEDI3_X86
+#if defined(ZNEDI3_X86)
 	ret = create_prescreener_new_x86(coeffs, pixel_half, cpu);
+#elif defined(ZNEDI3_ARM)
+	ret = create_prescreener_new_arm(coeffs, pixel_half, cpu);
 #endif
 
 	if (!ret)
@@ -362,8 +372,10 @@ std::unique_ptr<Predictor> create_predictor(const std::pair<const PredictorTrait
 {
 	std::unique_ptr<Predictor> ret;
 
-#ifdef ZNEDI3_X86
+#if defined(ZNEDI3_X86)
 	ret = create_predictor_x86(model, use_q2, cpu);
+#elif defined(ZNEDI3_ARM)
+	ret = create_predictor_arm(model, use_q2, cpu);
 #endif
 
 	if (!ret)
