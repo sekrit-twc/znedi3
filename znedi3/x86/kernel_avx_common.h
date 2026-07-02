@@ -878,11 +878,12 @@ class PredictorAVX final : public Predictor {
 		float *activation_softmax = activation;
 		float *activation_elliott = activation + 4 * nns;
 
+		input_stddev_x4_avx(partial_sum_sumsq, mstd, m_inv_filter_size);
+
 		for (unsigned q = 0; q < (m_use_q2 ? 2U : 1U); ++q) {
 			const float *neurons = q ? m_model.neurons_q2 : m_model.neurons_q1;
 			const float *bias = q ? m_model.bias_q2 : m_model.bias_q1;
 
-			input_stddev_x4_avx(partial_sum_sumsq, mstd, m_inv_filter_size);
 			sgemv_x4_avx(neurons, input, bias, nns * 2, filter_size, activation, nns, mstd + 2 * 4);
 			softmax_exp_avx(activation_softmax, 4 * nns);
 			wae5_x4_avx(activation_softmax, activation_elliott, nns, mstd);
@@ -913,8 +914,8 @@ public:
 		LinearAllocator alloc{ tmp };
 
 		ptrdiff_t window_offset_y = 3 - static_cast<ptrdiff_t>(m_model.ydim / 2);
-		ptrdiff_t window_offset_x = m_model.xdim / 2 - 1;
-		unsigned filter_size = m_model.xdim * m_model.ydim;
+		ptrdiff_t window_offset_x = static_cast<size_t>(m_model.xdim) / 2 - 1;
+		size_t filter_size = static_cast<size_t>(m_model.xdim) * m_model.ydim;
 
 		float *input = alloc.allocate_n<float>(48 * 6 * 4);
 		float *activation = alloc.allocate_n<float>(256 * 2 * 4);
@@ -922,7 +923,7 @@ public:
 
 		__m256d partial_sum_sumsq[8];
 		unsigned gathered_idx[4];
-		unsigned num_gathered = 0;
+		size_t num_gathered = 0;
 
 		for (ptrdiff_t i = 0; i < static_cast<ptrdiff_t>(n); ++i) {
 			if (prescreen[i])
@@ -935,10 +936,9 @@ public:
 			if (num_gathered == 4) {
 				apply_model(input, activation, mstd, partial_sum_sumsq);
 
-				dst[gathered_idx[0]] = mstd[3 * 4 + 0];
-				dst[gathered_idx[1]] = mstd[3 * 4 + 1];
-				dst[gathered_idx[2]] = mstd[3 * 4 + 2];
-				dst[gathered_idx[3]] = mstd[3 * 4 + 3];
+				for (ptrdiff_t idx = 0; idx < 4; ++idx) {
+					dst[gathered_idx[idx]] = mstd[3 * 4 + idx] * (m_use_q2 ? 0.5f : 1.0f);
+				}
 
 				num_gathered = 0;
 			}
@@ -946,8 +946,8 @@ public:
 		if (num_gathered) {
 			apply_model(input, activation, mstd, partial_sum_sumsq);
 
-			for (unsigned idx = 0; idx < num_gathered; ++idx) {
-				dst[gathered_idx[idx]] = mstd[3 * 4 + idx];
+			for (ptrdiff_t idx = 0; idx < static_cast<ptrdiff_t>(num_gathered); ++idx) {
+				dst[gathered_idx[idx]] = mstd[3 * 4 + idx] * (m_use_q2 ? 0.5f : 1.0f);
 			}
 		}
 	}

@@ -1012,11 +1012,12 @@ class PredictorAVX512F final : public Predictor {
 		float *activation_softmax = activation;
 		float *activation_elliott = activation + 4 * nns;
 
+		input_stddev_x4(partial_sum_sumsq, mstd, m_inv_filter_size);
+
 		for (unsigned q = 0; q < (m_use_q2 ? 2U : 1U); ++q) {
 			const float *neurons = q ? m_model.neurons_q2 : m_model.neurons_q1;
 			const float *bias = q ? m_model.bias_q2 : m_model.bias_q1;
 
-			input_stddev_x4(partial_sum_sumsq, mstd, m_inv_filter_size);
 			sgemv_x4_avx512<N>(neurons, input, bias, nns * 2, filter_size, activation, nns, mstd + 2 * 4);
 			softmax_exp(activation_softmax, 4 * nns);
 			wae5_x4(activation_softmax, activation_elliott, nns, mstd);
@@ -1069,10 +1070,9 @@ public:
 			if (num_gathered == 4) {
 				apply_model(input, activation, mstd, partial_sum_sumsq);
 
-				dst[gathered_idx[0]] = mstd[3 * 4 + 0];
-				dst[gathered_idx[1]] = mstd[3 * 4 + 1];
-				dst[gathered_idx[2]] = mstd[3 * 4 + 2];
-				dst[gathered_idx[3]] = mstd[3 * 4 + 3];
+				for (ptrdiff_t idx = 0; idx < 4; ++idx) {
+					dst[gathered_idx[idx]] = mstd[3 * 4 + idx] * (m_use_q2 ? 0.5f : 1.0f);
+				}
 
 				num_gathered = 0;
 			}
@@ -1081,7 +1081,7 @@ public:
 			apply_model(input, activation, mstd, partial_sum_sumsq);
 
 			for (ptrdiff_t idx = 0; idx < static_cast<ptrdiff_t>(num_gathered); ++idx) {
-				dst[gathered_idx[idx]] = mstd[3 * 4 + idx];
+				dst[gathered_idx[idx]] = mstd[3 * 4 + idx] * (m_use_q2 ? 0.5f : 1.0f);
 			}
 		}
 	}
