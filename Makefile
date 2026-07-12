@@ -23,9 +23,13 @@ graphengine_OBJS = \
 znedi3_HDRS = \
 	znedi3/align.h \
 	znedi3/alloc.h \
+	znedi3/arm/cpuinfo_arm.h \
+	znedi3/arm/kernel_arm.h \
+	znedi3/arm/kernel_neon_common.h \
 	znedi3/ccdep.h \
 	znedi3/cpuinfo.h \
 	znedi3/kernel.h \
+	znedi3/kernel_interleaved.h \
 	znedi3/weights.h \
 	znedi3/x86/kernel_x86.h \
 	znedi3/x86/kernel_avx_common.h \
@@ -36,7 +40,14 @@ znedi3_HDRS = \
 
 znedi3_OBJS = \
 	znedi3/kernel.o \
+	znedi3/kernel_interleaved.o \
 	znedi3/weights.o \
+	znedi3/arm/cpuinfo_arm.o \
+	znedi3/arm/kernel_arm.o \
+	znedi3/arm/kernel_neon.o \
+	znedi3/arm/kernel_sme.o \
+	znedi3/arm/kernel_sme_driver.o \
+	znedi3/arm/kernel_sve.o \
 	znedi3/x86/cpuinfo_x86.o \
 	znedi3/x86/kernel_avx.o \
 	znedi3/x86/kernel_avx2.o \
@@ -82,6 +93,22 @@ ifeq ($(X86_AVX512), 1)
   MY_CPPFLAGS := -DZNEDI3_X86_AVX512 $(MY_CPPFLAGS)
 endif
 
+ifeq ($(ARM), 1)
+  znedi3/arm/kernel_neon.o: EXTRA_CXXFLAGS := -march=armv8-a
+  MY_CPPFLAGS := -DZNEDI3_ARM $(MY_CPPFLAGS)
+endif
+
+ifeq ($(ARM_SVE), 1)
+  znedi3/arm/kernel_sve.o: EXTRA_CXXFLAGS := -march=armv8.2-a+fp16+sve
+  MY_CPPFLAGS := -DZNEDI3_ARM_SVE $(MY_CPPFLAGS)
+endif
+
+ifeq ($(ARM_SME), 1)
+  znedi3/arm/kernel_sme.o: EXTRA_CXXFLAGS := -march=armv8.2-a+fp16+sme2
+  znedi3/arm/kernel_sme_driver.o: EXTRA_CXXFLAGS := -march=armv8.2-a+fp16
+  MY_CPPFLAGS := -DZNEDI3_ARM_SME $(MY_CPPFLAGS)
+endif
+
 all: vsznedi3.so
 
 testapp/testapp: $(testapp_OBJS) $(znedi3_OBJS) $(graphengine_OBJS)
@@ -91,7 +118,7 @@ vsznedi3.so: vsznedi3/vsznedi3.o vsxx/vsxx4_pluginmain.o $(znedi3_OBJS) $(graphe
 	$(CXX) -shared $(MY_LDFLAGS) $^ $(MY_LIBS) -o $@
 
 clean:
-	rm -f *.a *.o *.so graphengine/graphengine/*.o graphengine/graphengine/x86/*.o testapp/testapp testapp/*.o znedi3/*.o znedi3/x86/*.o vsznedi3/*.o vsxx/*.o
+	rm -f *.a *.o *.so graphengine/graphengine/*.o graphengine/graphengine/x86/*.o testapp/testapp testapp/*.o znedi3/*.o znedi3/arm/*.o znedi3/x86/*.o vsznedi3/*.o vsxx/*.o
 
 %.o: %.cpp $(graphengine_HDRS) $(znedi3_HDRS) $(testapp_HDRS) $(vsxx_HDRS)
 	$(CXX) -c $(EXTRA_CXXFLAGS) $(MY_CXXFLAGS) $(MY_CPPFLAGS) $< -o $@

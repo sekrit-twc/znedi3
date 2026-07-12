@@ -10,7 +10,7 @@ extern "C" {
 typedef enum znedi3_cpu_type_e {
 	ZNEDI3_CPU_NONE     = 0, /**< Portable C-based implementation. */
 	ZNEDI3_CPU_AUTO     = 1, /**< Runtime CPU detection. */
-	ZNEDI3_CPU_AUTO_64B = 2  /**< Allow use of 64-byte (512-bit) instructions. */
+	ZNEDI3_CPU_AUTO_64B = 2  /**< Runtime CPU detection allowing 512-bit (64-byte) AVX-512 on x86, SME on arm. */
 #if defined(__i386) || defined(_M_IX86) || defined(_M_X64) || defined(__x86_64__)
 	,ZNEDI3_CPU_X86_MMX       = 1000,
 	ZNEDI3_CPU_X86_SSE        = 1001,
@@ -29,6 +29,11 @@ typedef enum znedi3_cpu_type_e {
 	ZNEDI3_CPU_X86_AVX512_SNC = 1014, /**< PMC + VPOPCNTDQ + BITALG + VBMI2 + VNNI */
 	ZNEDI3_CPU_X86_AVX512_WLC = 1015, /**< SNC + VP2INTERSECT */
 	ZNEDI3_CPU_X86_AVX512_GLC = 1016  /**< WLC + FP16 + BF16 */
+#endif
+#if defined(__aarch64__) || defined(_M_ARM64)
+	,ZNEDI3_CPU_ARM_NEON = 2000,
+	ZNEDI3_CPU_ARM_SVE   = 2001, /**< Non-streaming SVE */
+	ZNEDI3_CPU_ARM_SME   = 2002  /**< SME outer-product matmul, NEON elsewhere. */
 #endif
 } znedi3_cpu_type_e;
 

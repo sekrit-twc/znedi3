@@ -54,6 +54,14 @@ CPUClass translate_cpu_type(znedi3_cpu_type_e e)
 	case ZNEDI3_CPU_X86_AVX512_GLC:
 		return CPUClass::X86_AVX512;
 #endif
+#ifdef ZNEDI3_ARM
+	case ZNEDI3_CPU_ARM_NEON:
+		return CPUClass::ARM_NEON;
+	case ZNEDI3_CPU_ARM_SVE:
+		return CPUClass::ARM_SVE;
+	case ZNEDI3_CPU_ARM_SME:
+		return CPUClass::ARM_SME;
+#endif
 	default:
 		throw std::domain_error{ "bad cpu" };
 	}
