@@ -44,8 +44,8 @@
 namespace znedi3 {
 namespace {
 
-// Applies a 4x4 transpose to each 128-bit lane.
-inline FORCE_INLINE void mm256_transpose2_4x4_ps(__m256 &a, __m256 &b, __m256 &c, __m256 &d)
+// Transpose two 4x4 matrices of 32-bit elements stored in the upper and lower 128-bit lanes.
+inline FORCE_INLINE void mm256_transpose4_x2_ps(__m256 &a, __m256 &b, __m256 &c, __m256 &d)
 {
 	__m256 t0 = _mm256_shuffle_ps(a, b, 0x44);
 	__m256 t1 = _mm256_shuffle_ps(c, d, 0x44);
@@ -57,6 +57,7 @@ inline FORCE_INLINE void mm256_transpose2_4x4_ps(__m256 &a, __m256 &b, __m256 &c
 	d = _mm256_shuffle_ps(t2, t3, 0xDD);
 }
 
+// Transpose a 4x4 matrix of 64-bit elements stored across 4 vectors.
 inline FORCE_INLINE void mm256_transpose4_pd(__m256d &a, __m256d &b, __m256d &c, __m256d &d)
 {
 	__m256d t0 = _mm256_unpacklo_pd(a, b);
@@ -69,6 +70,7 @@ inline FORCE_INLINE void mm256_transpose4_pd(__m256d &a, __m256d &b, __m256d &c,
 	d = _mm256_permute2f128_pd(t2, t3, 0x31);
 }
 
+// Exchange the upper 128-bit lane of a with the lower 128-bit lane of b.
 inline FORCE_INLINE void mm256_transpose2_ps128(__m256 &a, __m256 &b)
 {
 	__m256 t0 = _mm256_permute2f128_ps(a, b, 0x20);
@@ -436,7 +438,7 @@ public:
 			tmp3 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[3] + 40), x2b, tmp3);
 			tmp3 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[3] + 56), x3b, tmp3);
 
-			mm256_transpose2_4x4_ps(tmp0, tmp1, tmp2, tmp3);
+			mm256_transpose4_x2_ps(tmp0, tmp1, tmp2, tmp3);
 			tmp0 = _mm256_add_ps(tmp0, tmp1);
 			tmp2 = _mm256_add_ps(tmp2, tmp3);
 			partial0 = _mm256_add_ps(tmp0, tmp2);
@@ -494,7 +496,7 @@ public:
 			tmp3 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[3] + 40), x2b, tmp3);
 			tmp3 = mm256_fmadd_ps(_mm256_load_ps(data.kernel_l0[3] + 56), x3b, tmp3);
 
-			mm256_transpose2_4x4_ps(tmp0, tmp1, tmp2, tmp3);
+			mm256_transpose4_x2_ps(tmp0, tmp1, tmp2, tmp3);
 			tmp0 = _mm256_add_ps(tmp0, tmp1);
 			tmp2 = _mm256_add_ps(tmp2, tmp3);
 			partial1 = _mm256_add_ps(tmp0, tmp2);
@@ -512,7 +514,7 @@ public:
 			tmp2 = _mm256_mul_ps(_mm256_broadcast_ps((const __m128 *)data.kernel_l1[2]), activation_l0);
 			tmp3 = _mm256_mul_ps(_mm256_broadcast_ps((const __m128 *)data.kernel_l1[3]), activation_l0);
 
-			mm256_transpose2_4x4_ps(tmp0, tmp1, tmp2, tmp3);
+			mm256_transpose4_x2_ps(tmp0, tmp1, tmp2, tmp3);
 			tmp0 = _mm256_add_ps(tmp0, tmp1);
 			tmp2 = _mm256_add_ps(tmp2, tmp3);
 			tmp0 = _mm256_add_ps(tmp0, tmp2);
@@ -834,14 +836,14 @@ inline FORCE_INLINE void wae5_x4_avx(const float *softmax, const float *elliott,
 		wsum3 = _mm256_add_ps(wsum3, s3);
 	}
 
-	mm256_transpose2_4x4_ps(vsum0, vsum1, vsum2, vsum3);
+	mm256_transpose4_x2_ps(vsum0, vsum1, vsum2, vsum3);
 	vsum0 = _mm256_add_ps(vsum0, vsum1);
 	vsum2 = _mm256_add_ps(vsum2, vsum3);
 	vsum0 = _mm256_add_ps(vsum0, vsum2);
 
 	__m128 vsum_reduced = _mm_add_ps(_mm256_castps256_ps128(vsum0), _mm256_extractf128_ps(vsum0, 1));
 
-	mm256_transpose2_4x4_ps(wsum0, wsum1, wsum2, wsum3);
+	mm256_transpose4_x2_ps(wsum0, wsum1, wsum2, wsum3);
 	wsum0 = _mm256_add_ps(wsum0, wsum1);
 	wsum2 = _mm256_add_ps(wsum2, wsum3);
 	wsum0 = _mm256_add_ps(wsum0, wsum2);
