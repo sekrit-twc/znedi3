@@ -55,6 +55,14 @@ void override_cpu_type(znedi3_cpu_type_e &dst, const std::string &str)
 	else if (str == "avx512")
 		dst = ZNEDI3_CPU_X86_AVX512F;
 #endif
+#if defined(__aarch64__) || defined(_M_ARM64)
+	if (str == "neon")
+		dst = ZNEDI3_CPU_ARM_NEON;
+	else if (str == "sve")
+		dst = ZNEDI3_CPU_ARM_SVE;
+	else if (str == "sme")
+		dst = ZNEDI3_CPU_ARM_SME;
+#endif
 }
 
 } // namespace

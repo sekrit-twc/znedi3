@@ -11,7 +11,7 @@ namespace znedi3 {
 enum class CPUClass {
 	NONE,
 	AUTO,
-	AUTO_64B,
+	AUTO_64B, // AUTO, also allowing 512-bit (64-byte) AVX-512 on x86, SME on arm.
 #if defined(ZNEDI3_X86)
 	X86_SSE,
 	X86_SSE2,
@@ -19,6 +19,11 @@ enum class CPUClass {
 	X86_F16C,
 	X86_AVX2,
 	X86_AVX512, // F, CD, BW, DQ, VL
+#endif
+#if defined(ZNEDI3_ARM)
+	ARM_NEON,
+	ARM_SVE,
+	ARM_SME,
 #endif
 };
 

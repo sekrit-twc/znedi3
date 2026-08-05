@@ -126,6 +126,11 @@ int arg_decode_cpu(const ArgparseOption *, void *out, const char *param, int)
 	ELSE_IF("avx2",   ZNEDI3_CPU_X86_AVX2);
 	ELSE_IF("avx512", ZNEDI3_CPU_X86_AVX512F);
 #endif
+#if defined(__aarch64__) || defined(_M_ARM64)
+	ELSE_IF("neon", ZNEDI3_CPU_ARM_NEON);
+	ELSE_IF("sve",  ZNEDI3_CPU_ARM_SVE);
+	ELSE_IF("sme",  ZNEDI3_CPU_ARM_SME);
+#endif
 	else
 		std::cerr << "unrecognized CPU type: " << param;
 

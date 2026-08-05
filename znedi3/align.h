@@ -11,6 +11,9 @@ namespace znedi3 {
 #if defined(ZNEDI3_X86)
 constexpr int ALIGNMENT = 64;
 constexpr int ALIGNMENT_RELAXED = 32;
+#elif defined(ZNEDI3_ARM)
+constexpr int ALIGNMENT = 64;
+constexpr int ALIGNMENT_RELAXED = 16;
 #else
 constexpr int ALIGNMENT = alignof(long double);
 constexpr int ALIGNMENT_RELAXED = alignof(long double);
